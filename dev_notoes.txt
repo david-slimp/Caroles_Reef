@@ -1,0 +1,20 @@
+Some devel notes / ideas / scratchpad.
+
+Very first initial code will be version 0.0.1
+First main goalpost should be MVP (Minimum Viable Product) at version 0.1.0
+
+
+Structure:
+caroles-reef-min/
+├── index.html
+├── src/
+│   ├── main.ts
+│   ├── scene.ts
+│   ├── fish.ts
+│   ├── coral.ts
+│   └── controls.ts
+├── styles.css
+├── package.json
+├── tsconfig.json
+└── vite.config.js
+

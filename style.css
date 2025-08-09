@@ -1,0 +1,20 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #001e26;
+    font-family: sans-serif;
+  }
+  
+  #ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+  }
+  
+  button {
+    font-size: 16px;
+    padding: 6px 10px;
+  }
+  
