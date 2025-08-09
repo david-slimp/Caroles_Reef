@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.2] - 2025-08-09
+### Added
+- Fish movement with natural swimming behavior
+- Coral decoration in the tank
+- "Add Fish" button to add more fish
+- Boundary detection to keep fish within tank
+- Smooth camera controls with orbit, pan, and zoom
+
+### Changed
+- Updated tank floor to a light golden sandy color
+- Improved floor material with better lighting properties
+- Added version display in the UI
+- Centralized version management in config/version.ts
+- Enhanced fish movement to be more natural and fluid
+- Increased coral size and visibility
+- Adjusted fish speed for more realistic movement
+
 ## [0.0.1] - 2025-08-09
 ### Initial Release
 
