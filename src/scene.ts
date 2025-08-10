@@ -51,17 +51,89 @@ export function initScene(): SceneContext {
 
   // Tank floor (smaller test tank)
   const floorGeo = new THREE.PlaneGeometry(6, 6);
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x553311 });
+  const floorMat = new THREE.MeshStandardMaterial({ 
+    color: 0x553311,
+    roughness: 0.8,
+    metalness: 0.1
+  });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -1;
   scene.add(floor);
 
-  // Add coral first and get its position
-  const coral = addCoral(scene);
+  // Add axis markers
+  function createAxisLine(color: number, start: THREE.Vector3, end: THREE.Vector3) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+    const material = new THREE.LineBasicMaterial({ 
+      color: color,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.7
+    });
+    return new THREE.Line(geometry, material);
+  }
+
+  // Create axis lines (slightly above the floor to prevent z-fighting)
+  const axisY = 0.01; // Slightly above the floor
+  const axisLength = 2.8; // Length of the axis lines
   
-  // Create fish with coral position as home
-  const start = addFish(scene, coral.position.clone());
+  // X-axis (red)
+  const xAxis = createAxisLine(
+    0xff0000,
+    new THREE.Vector3(-axisLength, axisY, 0),
+    new THREE.Vector3(axisLength, axisY, 0)
+  );
+  
+  // Z-axis (blue)
+  const zAxis = createAxisLine(
+    0x0000ff,
+    new THREE.Vector3(0, axisY, -axisLength),
+    new THREE.Vector3(0, axisY, axisLength)
+  );
+  
+  // Add axis lines to the scene
+  scene.add(xAxis, zAxis);
+  
+  // Add labels
+  function createAxisLabel(text: string, position: THREE.Vector3, color: number) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return new THREE.Group();
+    
+    canvas.width = 256;
+    canvas.height = 128;
+    context.fillStyle = '#000000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.font = 'Bold 100px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ 
+      map: texture,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const sprite = new THREE.Sprite(material);
+    sprite.position.copy(position);
+    sprite.scale.set(0.5, 0.25, 1);
+    return sprite;
+  }
+  
+  // Add labels at the ends of the axes
+  scene.add(createAxisLabel('+X', new THREE.Vector3(axisLength + 0.3, 0.1, 0), 0xff0000));
+  scene.add(createAxisLabel('-X', new THREE.Vector3(-axisLength - 0.3, 0.1, 0), 0xff0000));
+  scene.add(createAxisLabel('+Z', new THREE.Vector3(0, 0.1, axisLength + 0.3), 0x0000ff));
+  scene.add(createAxisLabel('-Z', new THREE.Vector3(0, 0.1, -axisLength - 0.3), 0x0000ff));
+
+  // Add coral
+  addCoral(scene);
+  
+  // Add initial fish at the center
+  addFish(scene);
 
   // Controls
   controls = new OrbitControls(camera, renderer.domElement);
@@ -78,15 +150,24 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-export function animate() {
+export function startAnimationLoop() {
+  lastTime = performance.now();
+  const animate = (timestamp: number) => {
+    requestAnimationFrame(animate);
+    
+    // Calculate delta time (capped to prevent large jumps)
+    const now = performance.now();
+    const delta = Math.min(0.1, (now - lastTime) / 1000);
+    lastTime = now;
+    
+    // Update fish movement
+    updateFishes(delta);
+    
+    // Update controls and render
+    controls.update();
+    renderer.render(scene, camera);
+  };
+  
+  // Start the loop
   requestAnimationFrame(animate);
-
-  // --- integrate fish movement ---
-  const now = performance.now();
-  const dt = (now - lastTime) / 1000; // seconds
-  lastTime = now;
-  updateFishes(dt);
-
-  controls.update();
-  renderer.render(scene, camera);
 }

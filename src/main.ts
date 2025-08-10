@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { initScene } from './scene';
-import { addFish, updateFishes, type SwimFish } from './fish';
+import { initScene, startAnimationLoop } from './scene';
+import { addFish, type SwimFish } from './fish';
 import { addCoral } from './coral';
 import { VERSION_DISPLAY } from './config/version';
 
@@ -8,7 +8,7 @@ console.log('Initializing Three.js scene...');
 
 // Initialize the scene
 const sceneContext = initScene();
-const { scene, camera, renderer } = sceneContext;
+const { scene, camera } = sceneContext;
 
 // Track all fish in the scene
 const fishes: SwimFish[] = [];
@@ -98,30 +98,8 @@ function addFishToTank() {
     }
 }
 
-// Animation loop
-function animationLoop(time: number) {
-    requestAnimationFrame(animationLoop);
-    
-    // Calculate delta time for smooth animation
-    const delta = Math.min(0.1, (time - lastTime) / 1000); // Cap delta time to prevent large jumps
-    lastTime = time;
-    
-    // Update all fish using the centralized update function
-    updateFishes(delta);
-    
-    // Update controls and render
-    sceneContext.controls?.update();
-    renderer.render(scene, camera);
-}
-
-// Initialize lastTime for the first frame
-let lastTime = 0;
-
-// Start the animation loop
-requestAnimationFrame((time) => {
-    lastTime = time;
-    animationLoop(time);
-});
+// Start the animation loop from scene.ts
+startAnimationLoop();
 
 // Add event listener for Add Fish button
 const addFishBtn = document.getElementById('addFishBtn');
@@ -148,7 +126,4 @@ versionElement.style.zIndex = '1000';
 versionElement.textContent = VERSION_DISPLAY;
 document.body.appendChild(versionElement);
 
-// Add fish button functionality
-document.getElementById('addFishBtn')?.addEventListener('click', () => {
-    addFishToTank();
-});
+// Button event listener is already added above

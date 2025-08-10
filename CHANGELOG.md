@@ -1,6 +1,22 @@
 # Changelog
 
-## [0.0.3] - Unreleased
+## [0.0.4] - 2025-08-10
+### Added
+- Debug visualization for fish orientation with colored markers
+- Green target ball and line showing fish's target
+- Red line showing fish's actual orientation
+- Blue and yellow markers for fish nose and tail positions
+
+### Changed
+- Completely rewrote fish orientation and movement logic
+- Fish now align nose and tail with target direction
+- Improved fish movement to always swim forward toward target
+- Enhanced fish rotation for more natural movement
+- Fixed fish swimming backward after alignment
+- Updated Three.js to latest version
+- Optimized fish update loop for better performance
+
+## [0.0.3] - 2025-08-09
 ### Added
 - New fish model with realistic shape and features
 - Fish now have eyes and proper tail fins

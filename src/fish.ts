@@ -1,367 +1,336 @@
-// src/fish.ts
+// src/fish.ts — Fish movement with perfect target alignment
 import * as THREE from "three";
 
-/** Keep a tiny school registry so the scene can update all fish each frame. */
+// Constants for movement
+const TARGET_RADIUS = 2.0;
+const EDGE_BUFFER = 0.5;
+const MIN_SPEED = 0.1;
+const MAX_SPEED = 0.5;
+const ACCEL = 1.0;
+const DRAG = 0.5;
+
 export interface SwimFish {
   group: THREE.Group;
   update(dt: number): void;
+  debug: {
+    targetBall: THREE.Mesh;
+    targetLine: THREE.Line;
+    showDebug: boolean;
+  };
 }
+
 const SCHOOL: SwimFish[] = [];
 
-/** Tank bounds (meters) - matches the sand base dimensions exactly */
-const BOUNDS = {
-  minX: -3, maxX: 3,     // Matches floor X bounds (-3 to 3)
-  minY: -1, maxY: 2,     // Keep some height for swimming
-  minZ: -3, maxZ: 3      // Matches floor Z bounds (-3 to 3)
-};
-
-function clamp(v: number, a: number, b: number) { return Math.max(a, Math.min(b, v)); }
-function rand(a: number, b: number) { return a + Math.random() * (b - a); }
-function angleDiff(a: number, b: number) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
-function lerpAngleShortest(a: number, b: number, t: number) { return a + angleDiff(a, b) * t; }
-
-/** Build a simple clownfish with +X forward, +Y up, +Z right. */
 function buildClownfish(): THREE.Group {
   const fish = new THREE.Group();
-
-  // Materials
-  const orange = new THREE.MeshStandardMaterial({ color: 0xff7a00, roughness: 0.6, metalness: 0.0 });
+  const orange = new THREE.MeshStandardMaterial({ color: 0xff7a00, roughness: 0.6 });
   const white  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-  const black  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  const black  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
 
-  // Body: ellipsoid (X length, Y height, Z thickness)
   const bodyGeo = new THREE.SphereGeometry(0.12, 20, 20);
   const body = new THREE.Mesh(bodyGeo, orange);
   body.scale.set(1.8, 1.2, 0.55);
   fish.add(body);
 
-  // White bands wrapping the body (axis along X)
-  const bandGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.022, 24, 1, true);
-  bandGeo.rotateZ(Math.PI / 2);
-  const band1 = new THREE.Mesh(bandGeo, white);
-  const band2 = band1.clone();
-  band1.scale.set(1.75, 1, 0.54);
-  band2.scale.copy(band1.scale);
-  band1.position.x = -0.02; // near head
-  band2.position.x =  0.10; // mid body
+  const ringGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.022, 24, 1, true);
+  ringGeo.rotateZ(Math.PI / 2);
+  const band1 = new THREE.Mesh(ringGeo, white); band1.scale.set(1.75, 1, 0.54); band1.position.x = -0.02;
+  const band2 = band1.clone(); band2.position.x = 0.10;
   fish.add(band1, band2);
 
-  // --- Tail fin: solid (extruded) fin in the YZ plane at the REAR (-X) ---
-  // Build a 2D fin profile in the XY plane, then extrude (depth) and rotate so depth aligns with +X.
   const tailShape = new THREE.Shape();
-  tailShape.moveTo(0.00,  0.00);
+  tailShape.moveTo(0.00, 0.00);
   tailShape.quadraticCurveTo(0.08, 0.12, 0.00, 0.24);
   tailShape.lineTo(-0.02, 0.24);
   tailShape.lineTo(-0.02, 0.00);
-
-  // Extrude settings: give the tail some thickness so it isn't razor thin.
-  const tailDepth = 0.06; // ~6 cm thickness, similar to body thickness
-  const tailExtrude = new THREE.ExtrudeGeometry(tailShape, {
-    depth: tailDepth,
-    bevelEnabled: false,
-    curveSegments: 16,
-    steps: 1,
-  });
-
-  // Center the extruded depth so the hinge axis runs through the middle
-  tailExtrude.translate(0, 0, -tailDepth * 0.5);
-
-  // Tail hinge: sits at the back of the body, local axis Y for swish.
-  const tailHinge = new THREE.Group();
-  tailHinge.name = "tailHinge";
-  tailHinge.position.set(-0.16, 0, 0); // back of fish (remember +X is forward)
-
-  // Tail mesh: rotate so the fin's plane is the YZ plane (depth now runs along +X)
-  const tail = new THREE.Mesh(tailExtrude, orange);
-  tail.name = "tail";
-  tail.rotation.y = Math.PI / 2; // put the fin into the YZ plane
-  tail.castShadow = false;
-  tail.receiveShadow = false;
-
-  // Optional thin black rim: slightly scale Y/Z (not X) to avoid z‑fighting
-  const tailRim = new THREE.Mesh(tailExtrude.clone(), black);
-  tailRim.name = "tailRim";
-  tailRim.rotation.copy(tail.rotation);
-  tailRim.scale.set(1.03, 1.03, 1.0); // puff the silhouette a hair in Y/Z
-
+  const tailDepth = 0.07;
+  const tailGeo = new THREE.ExtrudeGeometry(tailShape, { depth: tailDepth, bevelEnabled: false, steps: 1, curveSegments: 16 });
+  tailGeo.translate(0, 0, -tailDepth * 0.5);
+  const tailHinge = new THREE.Group(); tailHinge.name = "tailHinge"; tailHinge.position.set(-0.16, 0, 0);
+  const tail = new THREE.Mesh(tailGeo, orange); tail.name = "tail"; tail.rotation.y = Math.PI / 2;
+  const tailRim = new THREE.Mesh(tailGeo.clone(), black); tailRim.rotation.copy(tail.rotation); tailRim.scale.set(1.03, 1.03, 1);
   tailHinge.add(tailRim, tail);
   fish.add(tailHinge);
 
-  // Eyes on BOTH sides (±Z), slightly forward (+X) and above (+Y)
-  const eyeGeo = new THREE.SphereGeometry(0.025, 16, 16);
-  const eyeMat = black;
-  const eyeX =  0.06;
-  const eyeY =  0.02;
-  const eyeZ =  0.07;
+  const eyeGeo = new THREE.SphereGeometry(0.022, 16, 16);
+  const eyeR = new THREE.Mesh(eyeGeo, black); eyeR.position.set(0.06, 0.02, +0.085);
+  const eyeL = new THREE.Mesh(eyeGeo, black); eyeL.position.set(0.06, 0.02, -0.085);
+  fish.add(eyeR, eyeL);
 
-  const eyeRight = new THREE.Mesh(eyeGeo, eyeMat); // +Z
-  eyeRight.position.set(eyeX, eyeY, +eyeZ);
-  eyeRight.name = "eyeRight";
-
-  const eyeLeft  = new THREE.Mesh(eyeGeo, eyeMat); // -Z
-  eyeLeft.position.set(eyeX, eyeY, -eyeZ);
-  eyeLeft.name = "eyeLeft";
-
-  fish.add(eyeRight, eyeLeft);
+  // Yellow dot at the NOSE (local +X) for debugging "front"
+  const noseMarker = new THREE.Mesh(new THREE.SphereGeometry(0.01, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+  noseMarker.position.set(0.24, 0, 0);
+  fish.add(noseMarker);
+  
+  // The fish model is built with its nose along +X
+  // No need for additional rotation here
 
   return fish;
 }
 
-/** Create a swimmer with a HOME anchor so it patrols around its spawn point. */
-function createSwimmer(homeOverride?: THREE.Vector3): SwimFish {
-  const group = buildClownfish();
+// ---------- helpers ----------
+const tmp = new THREE.Vector3();
+// Tank boundaries (aligned with scene.ts)
+const TANK_BOUNDS = {
+  minX: -3, maxX: 3,
+  minY: -1,  maxY: 2,  // Slightly above floor to prevent getting stuck
+  minZ: -3, maxZ: 3,
+  radius: 2.5  // Maximum distance from center for targets
+};
 
-  // Initial transform
-  if (homeOverride) {
-    group.position.copy(homeOverride);
-  } else {
-    group.position.set(
-      rand(BOUNDS.minX * 0.7, BOUNDS.maxX * 0.7),
-      rand(BOUNDS.minY * 0.7, BOUNDS.maxY * 0.6),
-      rand(BOUNDS.minZ * 0.7, BOUNDS.maxZ * 0.7)
-    );
-  }
-  group.rotation.y = rand(-Math.PI, Math.PI); // heading (yaw)
-  group.rotation.x = rand(-0.06, 0.06);       // small pitch
-
-  // --- HOME TETHER ---
-  const home = group.position.clone(); // anchor
-  const HOME_RADIUS = 0.9;             // comfortable patrol radius
-  const LEASH_RADIUS = 1.6;            // must-come-back radius
-  const HOME_PULL_SOFT = 0.15;         // blend factor toward home when outside HOME_RADIUS
-  const HOME_PULL_HARD = 0.35;         // stronger pull when beyond LEASH_RADIUS
-
-  // Swim parameters
-  let speed = rand(0.22, 0.38);           // m/s
-  const minSpeed = 0.18, maxSpeed = 0.55;
-  const maxYawRate   = THREE.MathUtils.degToRad(55);
-  const maxPitchRate = THREE.MathUtils.degToRad(25);
-  let wanderTimer = 0;
-  let targetYaw = group.rotation.y;
-  let targetPitch = group.rotation.x;
-
-  // Smoothed rotations
-  let currentYaw = group.rotation.y;
-  let currentPitch = group.rotation.x;
-  let currentRoll = 0;
-
-  // Tail anim
-  const tail = group.getObjectByName("tail") as THREE.Mesh | null;
-  const tailHinge = group.getObjectByName("tailHinge") as THREE.Group | null;
-  let swimTime = 0;
-
-  const tmpDir = new THREE.Vector3(); // forward vector in world space
-
-  function steerToward(yawGoal: number, pitchGoal: number, dt: number) {
-    const dy = angleDiff(currentYaw, yawGoal);
-    const dp = pitchGoal - currentPitch;
-
-    currentYaw += THREE.MathUtils.clamp(dy, -maxYawRate * dt,   maxYawRate * dt);
-    currentPitch += THREE.MathUtils.clamp(dp, -maxPitchRate * dt, maxPitchRate * dt);
-    currentPitch = clamp(currentPitch, -0.35, 0.35);
-
-    // roll into turns
-    const targetRoll = -dy * 0.18;
-    currentRoll = THREE.MathUtils.lerp(currentRoll, targetRoll, 0.12);
-
-    group.rotation.set(currentPitch, currentYaw, currentRoll, "YXZ");
-  }
-
-  function pickWanderTargetAroundHome() {
-    // Calculate max radius that keeps us within bounds
-    const maxRadiusX = Math.min(
-      HOME_RADIUS,
-      BOUNDS.maxX - home.x,
-      home.x - BOUNDS.minX
-    );
-    const maxRadiusZ = Math.min(
-      HOME_RADIUS,
-      BOUNDS.maxZ - home.z,
-      home.z - BOUNDS.minZ
-    );
-    const maxRadius = Math.min(maxRadiusX, maxRadiusZ, HOME_RADIUS) * 0.8; // 80% of max to keep some margin
-    
-    // Pick a point within the safe radius
-    const r = rand(0.3, maxRadius); // Use at least 30% of max radius
-    const az = rand(-Math.PI, Math.PI);
-    const yOff = rand(-0.25, 0.25); // modest vertical variation
-
-    // Calculate target position, ensuring it stays within bounds
-    let targetX = home.x + Math.cos(az) * r;
-    let targetZ = home.z + Math.sin(az) * r;
-    
-    // Ensure we don't get too close to walls
-    targetX = THREE.MathUtils.clamp(targetX, BOUNDS.minX + 0.5, BOUNDS.maxX - 0.5);
-    targetZ = THREE.MathUtils.clamp(targetZ, BOUNDS.minZ + 0.5, BOUNDS.maxZ - 0.5);
-    
-    const target = new THREE.Vector3(
-      targetX,
-      clamp(home.y + yOff, BOUNDS.minY + 0.1, BOUNDS.maxY - 0.1),
-      targetZ
-    );
-
-    // Aim at that point
-    const dir = target.clone().sub(group.position);
-    const yaw = Math.atan2(dir.z, dir.x);
-    const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
-
-    // Blend toward this new local target
-    targetYaw = lerpAngleShortest(targetYaw, yaw, 0.35); // Slower turn rate for more natural movement
-    targetPitch = clamp(THREE.MathUtils.lerp(targetPitch, pitch, 0.35), -0.25, 0.25);
-  }
-
-  function homeTether(dt: number) {
-    const d = group.position.distanceTo(home);
-    
-    // Calculate how close we are to boundaries
-    const nearBoundaryX = group.position.x <= BOUNDS.minX + 0.5 || group.position.x >= BOUNDS.maxX - 0.5;
-    const nearBoundaryZ = group.position.z <= BOUNDS.minZ + 0.5 || group.position.z >= BOUNDS.maxZ - 0.5;
-    const nearBoundary = nearBoundaryX || nearBoundaryZ;
-    
-    // Only apply home tether if we're not near a boundary
-    if (!nearBoundary) {
-      if (d > LEASH_RADIUS) {
-        // hard pull back to home
-        const dir = home.clone().sub(group.position).normalize();
-        const yawHome = Math.atan2(dir.z, dir.x);
-        const pitchHome = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
-        targetYaw = lerpAngleShortest(targetYaw, yawHome, HOME_PULL_HARD * 0.5); // Reduced pull strength
-        targetPitch = THREE.MathUtils.lerp(targetPitch, pitchHome, HOME_PULL_HARD * 0.5);
-        speed = THREE.MathUtils.lerp(speed, maxSpeed * 0.7, 0.1); // Reduced speed boost
-      } else if (d > HOME_RADIUS) {
-        // soft pull back - only apply if not already turning from boundary
-        const dir = home.clone().sub(group.position).normalize();
-        const yawHome = Math.atan2(dir.z, dir.x);
-        const pitchHome = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
-        targetYaw = lerpAngleShortest(targetYaw, yawHome, HOME_PULL_SOFT * 0.3); // Much softer pull
-        targetPitch = THREE.MathUtils.lerp(targetPitch, pitchHome, HOME_PULL_SOFT * 0.3);
-        speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.5, 0.05);
-      }
-    }
-    
-    // Always maintain a minimum speed to prevent getting stuck
-    if (speed < minSpeed * 0.8) {
-      speed = minSpeed * 0.8;
-    }
-  }
-
-  // Track how long we've been near a boundary
-  let boundaryTimer = 0;
-  const MAX_BOUNDARY_TIME = 1.0; // seconds
-  let escapeDirection = new THREE.Vector3();
+function rand(a: number, b: number) { return a + Math.random() * (b - a); }
+function randomPointNear(center: THREE.Vector3, radius: number, out = new THREE.Vector3()) {
+  // Generate a point in a cylinder (not sphere) to keep fish swimming more horizontally
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.sqrt(Math.random()) * Math.min(radius, TANK_BOUNDS.radius);
   
-  function keepInsideBounds(dt: number) {
-    // First, clamp position to stay within bounds
-    const wasClampedX = group.position.x <= BOUNDS.minX || group.position.x >= BOUNDS.maxX;
-    const wasClampedZ = group.position.z <= BOUNDS.minZ || group.position.z >= BOUNDS.maxZ;
-    
-    // Apply a small push away from boundaries
-    const boundaryPush = 0.1;
-    if (group.position.x <= BOUNDS.minX + 0.1) group.position.x = BOUNDS.minX + 0.1;
-    if (group.position.x >= BOUNDS.maxX - 0.1) group.position.x = BOUNDS.maxX - 0.1;
-    if (group.position.z <= BOUNDS.minZ + 0.1) group.position.z = BOUNDS.minZ + 0.1;
-    if (group.position.z >= BOUNDS.maxZ - 0.1) group.position.z = BOUNDS.maxZ - 0.1;
-    
-    // Check if we're near any boundary
-    const margin = 0.75; // Increased margin for earlier detection
-    const nearLeft = group.position.x <= BOUNDS.minX + margin;
-    const nearRight = group.position.x >= BOUNDS.maxX - margin;
-    const nearFront = group.position.z <= BOUNDS.minZ + margin;
-    const nearBack = group.position.z >= BOUNDS.maxZ - margin;
-    const nearBoundary = nearLeft || nearRight || nearFront || nearBack;
-    
-    if (nearBoundary) {
-      boundaryTimer += dt;
-      
-      // If we've been near a boundary too long, pick a new escape direction
-      if (boundaryTimer > MAX_BOUNDARY_TIME * 0.5) {
-        // Calculate escape direction based on which boundaries we're near
-        escapeDirection.set(0, 0, 0);
-        
-        if (nearLeft) escapeDirection.x += 1;
-        if (nearRight) escapeDirection.x -= 1;
-        if (nearFront) escapeDirection.z += 1;
-        if (nearBack) escapeDirection.z -= 1;
-        
-        // If in a corner, add some randomness to escape
-        const inCorner = (nearLeft || nearRight) && (nearFront || nearBack);
-        if (inCorner) {
-          escapeDirection.x += (Math.random() - 0.5) * 2;
-          escapeDirection.z += (Math.random() - 0.5) * 2;
-        }
-        
-        escapeDirection.normalize();
-        
-        // Calculate target yaw based on escape direction
-        targetYaw = Math.atan2(escapeDirection.z, escapeDirection.x);
-        targetPitch = (Math.random() - 0.5) * 0.2; // Slight vertical movement
-        
-        // If we've been stuck too long, try a more aggressive escape
-        if (boundaryTimer > MAX_BOUNDARY_TIME * 2) {
-          // Pick a completely random direction
-          targetYaw = Math.random() * Math.PI * 2;
-          targetPitch = (Math.random() - 0.5) * 0.5;
-          boundaryTimer = 0; // Reset timer to prevent rapid direction changes
-        }
-      }
-      
-      // Apply boundary push force
-      const pushForce = 0.05;
-      if (nearLeft) group.position.x += pushForce;
-      if (nearRight) group.position.x -= pushForce;
-      if (nearFront) group.position.z += pushForce;
-      if (nearBack) group.position.z -= pushForce;
-    } else {
-      // Reset the timer and escape direction when not near a boundary
-      boundaryTimer = 0;
-      escapeDirection.set(0, 0, 0);
-    }
-  }
-
-  function update(dt: number) {
-    const deltaTime = Math.min(dt, 0.05); // avoid big jumps
-    swimTime += deltaTime;
-
-    // Periodically choose a new wander direction around HOME
-    wanderTimer -= deltaTime;
-    if (wanderTimer <= 0) {
-      wanderTimer = rand(0.7, 1.5);
-      pickWanderTargetAroundHome();
-    }
-
-    // Apply home tether + bounds bias
-    homeTether(deltaTime);
-    keepInsideBounds();
-
-    // Steer and move forward along local +X
-    steerToward(targetYaw, targetPitch, deltaTime);
-
-    const forward = tmpDir.set(1, 0, 0).applyEuler(group.rotation).normalize();
-    group.position.addScaledVector(forward, speed * deltaTime);
-
-    // Vertical clamp (soft)
-    group.position.y = clamp(group.position.y, BOUNDS.minY, BOUNDS.maxY);
-
-    // Tail wag (swish by rotating the HINGE around local Y)
-    if (tailHinge) {
-      tailHinge.rotation.y = Math.sin(swimTime * (3.5 + speed * 4.0)) * 0.25;
-    }
-  }
-
-  return { group, update };
+  // Calculate position relative to center
+  const x = center.x + Math.cos(angle) * distance;
+  const z = center.z + Math.sin(angle) * distance;
+  
+  // Keep fish within tank bounds
+  out.set(
+    THREE.MathUtils.clamp(x, TANK_BOUNDS.minX, TANK_BOUNDS.maxX),
+    THREE.MathUtils.clamp(center.y + (Math.random() - 0.5) * 0.5, TANK_BOUNDS.minY, TANK_BOUNDS.maxY),
+    THREE.MathUtils.clamp(z, TANK_BOUNDS.minZ, TANK_BOUNDS.maxZ)
+  );
+  
+  return out;
 }
 
-/** Public API: add a new fish to the scene and register it for updates.
- *  Optionally provide a home position so the fish patrols that area.
- */
-export function addFish(scene: THREE.Scene, homePos?: THREE.Vector3): SwimFish {
-  const f = createSwimmer(homePos);
+function keepInBounds(position: THREE.Vector3) {
+  position.x = THREE.MathUtils.clamp(position.x, TANK_BOUNDS.minX, TANK_BOUNDS.maxX);
+  position.y = THREE.MathUtils.clamp(position.y, TANK_BOUNDS.minY, TANK_BOUNDS.maxY);
+  position.z = THREE.MathUtils.clamp(position.z, TANK_BOUNDS.minZ, TANK_BOUNDS.maxZ);
+  return position;
+}
+
+// ---------- movement: forward‑only heading + scalar speed ----------
+function createSwimmer(scene: THREE.Scene, spawn?: THREE.Vector3): SwimFish {
+  const group = buildClownfish();
+  group.rotation.order = "YXZ"; // yaw → pitch → roll
+  if (spawn) group.position.copy(spawn);
+
+  // --- Single source of truth for heading ---
+  let yaw = rand(-Math.PI, Math.PI);   // radians, our ONLY heading value
+  let speed = 0.15;                    // m/s scalar speed
+
+  // Initial random target near the fish's spawn position
+  let target = randomPointNear(spawn || group.position, 1.5);
+  let retargetTimer = rand(1.2, 2.2);
+  let lastTargetChange = 0;
+
+  // Tunables
+  const MAX_SPEED = 0.45;
+  const MIN_SPEED = 0.05;
+  const ACCEL = 0.50;                 // m/s^2 baseline thrust
+  const DRAG = 0.35;                  // per‑second drag on speed
+  const MAX_TURN_RATE = THREE.MathUtils.degToRad(360); // yaw turn cap
+  const TARGET_RADIUS = 1.0;          // local hop distance
+  const EDGE_BUFFER = 1.0;            // early avoid walls
+  let isTurning = false;              // state flag
+
+  const tailHinge = group.getObjectByName("tailHinge") as THREE.Group | null;
+  let t = 0;
+  
+  // Create debug visualization
+  // Debug markers
+  const debugMarkers = {
+    nose: (() => {
+      const geometry = new THREE.SphereGeometry(0.03, 8, 8);
+      const material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+      const marker = new THREE.Mesh(geometry, material);
+      scene.add(marker);
+      return marker;
+    })(),
+    tail: (() => {
+      const geometry = new THREE.SphereGeometry(0.03, 8, 8);
+      const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const marker = new THREE.Mesh(geometry, material);
+      scene.add(marker);
+      return marker;
+    })()
+  };
+
+  const debug = {
+    showDebug: true,
+    targetBall: (() => {
+      const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.visible = false;
+      scene.add(sphere);
+      return sphere;
+    })(),
+    targetLine: (() => {
+      const geometry = new THREE.BufferGeometry();
+      const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+      const line = new THREE.Line(geometry, material);
+      line.visible = false;
+      scene.add(line);
+      return line;
+    })(),
+    noseLine: (() => {
+      const geometry = new THREE.BufferGeometry();
+      const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+      const line = new THREE.Line(geometry, material);
+      line.visible = false;
+      scene.add(line);
+      return line;
+    })()
+  };
+
+  function update(dt: number) {
+    const h = Math.min(dt, 0.05);
+    t += h;
+
+      // --- Debug visuals ---
+    if (debug.showDebug) {
+      // Green target ball
+      debug.targetBall.position.copy(target);
+      debug.targetBall.visible = true;
+      
+      // Get the world position of the fish's center
+      const centerPosition = group.position.clone();
+      
+      // Calculate the fish's forward direction in world space
+      const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+      
+      // Calculate nose and tail positions in world space
+      const nosePosition = centerPosition.clone().add(forward.clone().multiplyScalar(0.24));
+      const tailPosition = centerPosition.clone().sub(forward.clone().multiplyScalar(0.16));
+      
+      // Update debug markers
+      debugMarkers.nose.position.copy(nosePosition);
+      debugMarkers.tail.position.copy(tailPosition);
+      
+      // Calculate vectors for alignment
+      const targetToNose = new THREE.Vector3().subVectors(nosePosition, target);
+      const targetToTail = new THREE.Vector3().subVectors(tailPosition, target);
+      
+      // Draw green line from target to nose
+      const targetLinePositions = new Float32Array([
+        target.x, target.y, target.z,
+        nosePosition.x, nosePosition.y, nosePosition.z
+      ]);
+      debug.targetLine.geometry.setAttribute('position', 
+        new THREE.BufferAttribute(targetLinePositions, 3));
+      debug.targetLine.geometry.computeBoundingSphere();
+      debug.targetLine.visible = true;
+      
+      // Draw red line from target to tail
+      const tailLinePositions = new Float32Array([
+        target.x, target.y, target.z,
+        tailPosition.x, tailPosition.y, tailPosition.z
+      ]);
+      debug.noseLine.geometry.setAttribute('position',
+        new THREE.BufferAttribute(tailLinePositions, 3));
+      debug.noseLine.geometry.computeBoundingSphere();
+      debug.noseLine.visible = true;
+    } else {
+      debug.targetBall.visible = false;
+      debug.targetLine.visible = false;
+      debug.noseLine.visible = false;
+    }
+    
+    // --- Retarget logic ---
+    retargetTimer -= h;
+    lastTargetChange += h;
+    const distanceToTarget = group.position.distanceTo(target);
+    const nearTarget = distanceToTarget < 0.3;
+    const shouldRetarget = retargetTimer <= 0 || nearTarget || lastTargetChange > 5;
+
+    const nearEdgeX = group.position.x > (TANK_BOUNDS.maxX - EDGE_BUFFER) || group.position.x < (TANK_BOUNDS.minX + EDGE_BUFFER);
+    const nearEdgeZ = group.position.z > (TANK_BOUNDS.maxZ - EDGE_BUFFER) || group.position.z < (TANK_BOUNDS.minZ + EDGE_BUFFER);
+
+    if (shouldRetarget || nearEdgeX || nearEdgeZ) {
+      const centerBias = new THREE.Vector3(-group.position.x, 0, -group.position.z).normalize();
+      const biasStrength = 0.3 + (nearEdgeX || nearEdgeZ ? 0.5 : 0);
+      const forwardDir = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+      const newDirection = new THREE.Vector3()
+        .addVectors(forwardDir.multiplyScalar(1 - biasStrength), centerBias.multiplyScalar(biasStrength))
+        .normalize();
+      target.copy(group.position).add(newDirection.multiplyScalar(TARGET_RADIUS));
+      const padding = 0.5;
+      target.x = THREE.MathUtils.clamp(target.x, TANK_BOUNDS.minX + padding, TANK_BOUNDS.maxX - padding);
+      target.z = THREE.MathUtils.clamp(target.z, TANK_BOUNDS.minZ + padding, TANK_BOUNDS.maxZ - padding);
+      target.y = THREE.MathUtils.clamp(group.position.y + (Math.random() - 0.5) * 0.5, TANK_BOUNDS.minY + 0.1, TANK_BOUNDS.maxY - 0.1);
+      retargetTimer = rand(1.5, 3.0);
+      lastTargetChange = 0;
+      isTurning = true;
+    }
+
+      // --- Movement and Rotation ---
+    const toTarget = new THREE.Vector3().subVectors(target, group.position);
+    
+    if (toTarget.lengthSq() > 0.01) {
+      // Get current fish forward vector in world space
+      const fishForward = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+      const fishRight = new THREE.Vector3(0, 1, 0).applyQuaternion(group.quaternion);
+      
+      // Calculate nose and tail positions in world space
+      const nosePosition = group.position.clone().add(fishForward.clone().multiplyScalar(0.24));
+      const tailPosition = group.position.clone().sub(fishForward.clone().multiplyScalar(0.16));
+      
+      // Calculate vectors from target to nose and tail
+      const targetToNose = new THREE.Vector3().subVectors(nosePosition, target);
+      const targetToTail = new THREE.Vector3().subVectors(tailPosition, target);
+      
+      // Normalize the vectors
+      targetToNose.normalize();
+      targetToTail.normalize();
+      
+      // Calculate the angle between the two vectors
+      let angle = Math.atan2(
+        targetToNose.x * targetToTail.z - targetToNose.z * targetToTail.x,
+        targetToNose.x * targetToTail.x + targetToNose.z * targetToTail.z
+      );
+      
+      // Check if we're pointing the wrong way (180° off)
+      const dot = toTarget.normalize().dot(fishForward);
+      if (dot < -0.5) { // If more than 120° off
+        // Flip the angle to point the other way
+        angle = (angle + Math.PI) % (Math.PI * 2);
+      }
+      
+      // Adjust yaw based on the angle between the vectors
+      yaw += angle * 0.1; // Dampen the rotation for smooth movement
+      
+      // Update fish rotation
+      group.rotation.set(0, yaw, 0);
+      
+      // Move fish forward along its current heading (always forward)
+      // Use the fish's forward vector to ensure consistent movement direction
+      const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+      group.position.x += forward.x * speed * h;
+      group.position.z += forward.z * speed * h;
+      
+      // Simple speed control
+      const distanceToTarget = toTarget.length();
+      const targetSpeed = Math.min(MAX_SPEED, distanceToTarget * 0.5);
+      speed = THREE.MathUtils.lerp(speed, targetSpeed, 0.1);
+    }
+
+    // --- Keep in bounds ---
+    keepInBounds(group.position);
+
+    // --- Tail wag ---
+    if (tailHinge) {
+      const tailSpeed = 10 * (0.5 + 0.5 * speed / MAX_SPEED);
+      tailHinge.rotation.z = 0.15 * Math.sin(tailSpeed * t);
+    }
+  }
+
+  return { group, update, debug };
+}
+
+export function addFish(scene: THREE.Scene, spawn?: THREE.Vector3): SwimFish {
+  const f = createSwimmer(scene, spawn);
   scene.add(f.group);
   SCHOOL.push(f);
   return f;
 }
 
-/** Call once per frame from your animate loop. dt = seconds since last frame. */
 export function updateFishes(dt: number) {
   for (const f of SCHOOL) f.update(dt);
 }

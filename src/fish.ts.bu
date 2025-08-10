@@ -1,0 +1,317 @@
+// src/fish.ts
+import * as THREE from "three";
+
+/** Keep a tiny school registry so the scene can update all fish each frame. */
+export interface SwimFish {
+  group: THREE.Group;
+  update(dt: number): void;
+}
+const SCHOOL: SwimFish[] = [];
+
+/** Tank bounds (meters) - matches the sand base dimensions exactly */
+const BOUNDS = {
+  minX: -3, maxX: 3,
+  minY: -1, maxY: 2,
+  minZ: -3, maxZ: 3
+};
+
+function clamp(v: number, a: number, b: number) { return Math.max(a, Math.min(b, v)); }
+function rand(a: number, b: number) { return a + Math.random() * (b - a); }
+function angleDiff(a: number, b: number) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+function lerpAngleShortest(a: number, b: number, t: number) { return a + angleDiff(a, b) * t; }
+
+/** Build a simple clownfish with +X forward, +Y up, +Z right. */
+function buildClownfish(): THREE.Group {
+  const fish = new THREE.Group();
+
+  // Materials
+  const orange = new THREE.MeshStandardMaterial({ color: 0xff7a00, roughness: 0.6, metalness: 0.0 });
+  const white  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+  const black  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+
+  // Body: ellipsoid (X length, Y height, Z thickness)
+  const bodyGeo = new THREE.SphereGeometry(0.12, 20, 20);
+  const body = new THREE.Mesh(bodyGeo, orange);
+  body.scale.set(1.8, 1.2, 0.55);
+  fish.add(body);
+
+  // White bands wrapping the body (axis along X)
+  const bandGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.022, 24, 1, true);
+  bandGeo.rotateZ(Math.PI / 2);
+  const band1 = new THREE.Mesh(bandGeo, white);
+  const band2 = band1.clone();
+  band1.scale.set(1.75, 1, 0.54);
+  band2.scale.copy(band1.scale);
+  band1.position.x = -0.02; // near head
+  band2.position.x =  0.10; // mid body
+  fish.add(band1, band2);
+
+  // Tail: solid (extruded) fin on a hinge at rear (-X), in the YZ plane
+  const tailShape = new THREE.Shape();
+  tailShape.moveTo(0.00,  0.00);
+  tailShape.quadraticCurveTo(0.08, 0.12, 0.00, 0.24);
+  tailShape.lineTo(-0.02, 0.24);
+  tailShape.lineTo(-0.02, 0.00);
+
+  const tailDepth = 0.06;
+  const tailExtrude = new THREE.ExtrudeGeometry(tailShape, {
+    depth: tailDepth, bevelEnabled: false, curveSegments: 16, steps: 1
+  });
+  tailExtrude.translate(0, 0, -tailDepth * 0.5);
+
+  const tailHinge = new THREE.Group();
+  tailHinge.name = "tailHinge";
+  tailHinge.position.set(-0.16, 0, 0);
+
+  const tail = new THREE.Mesh(tailExtrude, orange);
+  tail.name = "tail";
+  tail.rotation.y = Math.PI / 2; // put into YZ plane
+
+  const tailRim = new THREE.Mesh(tailExtrude.clone(), black);
+  tailRim.name = "tailRim";
+  tailRim.rotation.copy(tail.rotation);
+  tailRim.scale.set(1.03, 1.03, 1.0);
+
+  tailHinge.add(tailRim, tail);
+  fish.add(tailHinge);
+
+  // Eyes on BOTH sides (±Z), slightly forward (+X) and above (+Y)
+  const eyeGeo = new THREE.SphereGeometry(0.025, 16, 16);
+  const eyeX =  0.06, eyeY = 0.02, eyeZ = 0.07;
+  const eyeRight = new THREE.Mesh(eyeGeo, black); eyeRight.position.set(eyeX, eyeY, +eyeZ); eyeRight.name = "eyeRight";
+  const eyeLeft  = new THREE.Mesh(eyeGeo, black); eyeLeft .position.set(eyeX, eyeY, -eyeZ); eyeLeft .name = "eyeLeft";
+  fish.add(eyeRight, eyeLeft);
+
+  return fish;
+}
+
+/** Create a swimmer with a HOME anchor and a SAFE ANCHOR (e.g., coral top). */
+function createSwimmer(homeOverride?: THREE.Vector3, safeAnchorOverride?: THREE.Vector3): SwimFish {
+  const group = buildClownfish();
+  group.rotation.order = "YXZ"; // yaw→pitch→roll
+
+  // Initial transform
+  if (homeOverride) {
+    group.position.copy(homeOverride);
+  } else {
+    group.position.set(
+      rand(BOUNDS.minX * 0.7, BOUNDS.maxX * 0.7),
+      rand(BOUNDS.minY * 0.7, BOUNDS.maxY * 0.6),
+      rand(BOUNDS.minZ * 0.7, BOUNDS.maxZ * 0.7)
+    );
+  }
+  group.rotation.y = rand(-Math.PI, Math.PI);
+  group.rotation.x = rand(-0.06, 0.06);
+
+  const home = group.position.clone();                                  // patrol anchor
+  const SAFE_ANCHOR = (safeAnchorOverride ?? new THREE.Vector3(0, -0.5, 0)).clone();
+
+  // ~body length along X after scaling: radius 0.12 → diameter 0.24; ×1.8 ≈ 0.432 m
+  const BODY_LENGTH = 0.24 * 1.8;
+  const BOUNDARY_TRIGGER = BODY_LENGTH * 2;                              // two body-lengths to any wall
+  const PREDICT_HORIZON = BODY_LENGTH * 1.0;                             // look-ahead distance
+
+  const HOME_RADIUS = 0.9, LEASH_RADIUS = 1.6;
+  const HOME_PULL_SOFT = 0.15, HOME_PULL_HARD = 0.35;
+
+  // Swim parameters
+  let speed = rand(0.22, 0.38);
+  const minSpeed = 0.18, maxSpeed = 0.55;
+  const maxYawRate = THREE.MathUtils.degToRad(55);
+  const maxPitchRate = THREE.MathUtils.degToRad(25);
+  let wanderTimer = 0;
+  let targetYaw = group.rotation.y;
+  let targetPitch = group.rotation.x;
+
+  // Smoothed rotations
+  let currentYaw = group.rotation.y;
+  let currentPitch = group.rotation.x;
+  let currentRoll = 0;
+
+  // Tail anim
+  const tailHinge = group.getObjectByName("tailHinge") as THREE.Group | null;
+  let swimTime = 0;
+
+  // Escape state so wander doesn't fight boundary correction
+  let escapeCooldown = 0; // seconds
+
+  const tmpDir = new THREE.Vector3();
+
+  function steerToward(yawGoal: number, pitchGoal: number, dt: number) {
+    const dy = angleDiff(currentYaw, yawGoal);
+    const dp = pitchGoal - currentPitch;
+
+    currentYaw   += THREE.MathUtils.clamp(dy, -maxYawRate * dt,   maxYawRate * dt);
+    currentPitch += THREE.MathUtils.clamp(dp, -maxPitchRate * dt, maxPitchRate * dt);
+    currentPitch  = clamp(currentPitch, -0.35, 0.35);
+
+    const targetRoll = -dy * 0.18; // visual roll into the turn
+    currentRoll = THREE.MathUtils.lerp(currentRoll, targetRoll, 0.12);
+
+    group.rotation.y = currentYaw;   // yaw
+    group.rotation.x = currentPitch; // pitch
+    group.rotation.z = currentRoll;  // roll
+  }
+
+  // Wander target around HOME, guaranteed inside (no clamp-to-wall)
+  function pickWanderTargetAroundHome() {
+    const margin = 0.5;
+    const roomXPos = BOUNDS.maxX - margin - home.x;
+    const roomXNeg = home.x - (BOUNDS.minX + margin);
+    const roomZPos = BOUNDS.maxZ - margin - home.z;
+    const roomZNeg = home.z - (BOUNDS.minZ + margin);
+    const maxRadius = Math.max(0.15, Math.min(HOME_RADIUS, roomXPos, roomXNeg, roomZPos, roomZNeg));
+
+    const r  = rand(maxRadius * 0.3, maxRadius);
+    const az = rand(-Math.PI, Math.PI);
+    const yOff = rand(-0.25, 0.25);
+
+    const target = new THREE.Vector3(
+      home.x + Math.cos(az) * r,
+      clamp(home.y + yOff, BOUNDS.minY + 0.1, BOUNDS.maxY - 0.1),
+      home.z + Math.sin(az) * r
+    );
+
+    const dir = target.clone().sub(group.position);
+    const yaw = Math.atan2(dir.z, dir.x);
+    const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
+
+    targetYaw   = lerpAngleShortest(targetYaw, yaw, 0.35);
+    targetPitch = clamp(THREE.MathUtils.lerp(targetPitch, pitch, 0.35), -0.25, 0.25);
+  }
+
+  // Gentle bias toward HOME
+  function homeTether(dt: number) {
+    const d = group.position.distanceTo(home);
+    const dir = home.clone().sub(group.position).normalize();
+    const yawHome   = Math.atan2(dir.z, dir.x);
+    const pitchHome = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
+
+    if (d > LEASH_RADIUS) {
+      targetYaw   = lerpAngleShortest(targetYaw, yawHome, HOME_PULL_HARD);
+      targetPitch = THREE.MathUtils.lerp(targetPitch, pitchHome, HOME_PULL_HARD);
+      speed = THREE.MathUtils.lerp(speed, maxSpeed * 0.85, 0.2);
+    } else if (d > HOME_RADIUS) {
+      targetYaw   = lerpAngleShortest(targetYaw, yawHome, HOME_PULL_SOFT);
+      targetPitch = THREE.MathUtils.lerp(targetPitch, pitchHome, HOME_PULL_SOFT);
+      speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.6, 0.1);
+    } else {
+      targetYaw   = lerpAngleShortest(targetYaw, yawHome, 0.02);
+      targetPitch = THREE.MathUtils.lerp(targetPitch, pitchHome, 0.02);
+      speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.55, 0.05);
+    }
+
+    if (speed < minSpeed * 0.9) speed = minSpeed * 0.9;
+  }
+
+  // A) Predictive boundary check: if the next step would cross a wall, retarget to SAFE_ANCHOR now
+  function predictiveBoundaryAvoid(dt: number) {
+    const forwardNow = tmpDir.set(1, 0, 0).applyEuler(group.rotation).normalize();
+    const lookaheadDist = Math.max(PREDICT_HORIZON, speed * dt * 3.0); // at least a body-length
+    const projected = group.position.clone().addScaledVector(forwardNow, lookaheadDist);
+
+    const outX = projected.x < BOUNDS.minX + 0.05 || projected.x > BOUNDS.maxX - 0.05;
+    const outZ = projected.z < BOUNDS.minZ + 0.05 || projected.z > BOUNDS.maxZ - 0.05;
+    if (outX || outZ) {
+      const toAnchor = SAFE_ANCHOR.clone().sub(group.position);
+      if (toAnchor.lengthSq() > 1e-6) {
+        const yaw   = Math.atan2(toAnchor.z, toAnchor.x);
+        const pitch = Math.atan2(toAnchor.y, Math.hypot(toAnchor.x, toAnchor.z));
+        targetYaw = yaw;
+        targetPitch = pitch;
+        // reduce speed a bit to complete the turn before reaching the wall
+        speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.55, 0.6);
+        escapeCooldown = 1.0; // suppress wandering for a moment
+      }
+    }
+  }
+
+  // B) Proximity trigger: if within ~2 body-lengths of any wall, also aim at SAFE_ANCHOR
+  function boundaryProximityTrigger() {
+    const dxMin = group.position.x - BOUNDS.minX;
+    const dxMax = BOUNDS.maxX - group.position.x;
+    const dzMin = group.position.z - BOUNDS.minZ;
+    const dzMax = BOUNDS.maxZ - group.position.z;
+    const nearest = Math.min(dxMin, dxMax, dzMin, dzMax);
+
+    if (nearest <= BOUNDARY_TRIGGER) {
+      const toAnchor = SAFE_ANCHOR.clone().sub(group.position);
+      if (toAnchor.lengthSq() > 1e-6) {
+        const yaw   = Math.atan2(toAnchor.z, toAnchor.x);
+        const pitch = Math.atan2(toAnchor.y, Math.hypot(toAnchor.x, toAnchor.z));
+        targetYaw = yaw;
+        targetPitch = pitch;
+        speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.6, 0.6);
+        escapeCooldown = Math.max(escapeCooldown, 1.2);
+      }
+    }
+  }
+
+  function update(dt: number) {
+    const deltaTime = Math.min(dt, 0.05);
+    swimTime += deltaTime;
+    if (escapeCooldown > 0) escapeCooldown -= deltaTime;
+
+    // Predictive avoidance first
+    predictiveBoundaryAvoid(deltaTime);
+
+    // Only wander when not escaping a boundary
+    wanderTimer -= deltaTime;
+    if (escapeCooldown <= 0 && wanderTimer <= 0) {
+      wanderTimer = rand(0.7, 1.5);
+      pickWanderTargetAroundHome();
+    }
+
+    // Proximity trigger & gentle home bias
+    boundaryProximityTrigger();
+    homeTether(deltaTime);
+
+    // Steer and move forward along local +X
+    steerToward(targetYaw, targetPitch, deltaTime);
+    const forward = tmpDir.set(1, 0, 0).applyEuler(group.rotation).normalize();
+    group.position.addScaledVector(forward, speed * deltaTime);
+
+    // Clamp vertical
+    group.position.y = clamp(group.position.y, BOUNDS.minY, BOUNDS.maxY);
+
+    // C) Hard clamp + inward retarget (safety net)
+    const clampedX = clamp(group.position.x, BOUNDS.minX + 0.05, BOUNDS.maxX - 0.05);
+    const clampedZ = clamp(group.position.z, BOUNDS.minZ + 0.05, BOUNDS.maxZ - 0.05);
+    if (clampedX !== group.position.x || clampedZ !== group.position.z) {
+      group.position.x = clampedX;
+      group.position.z = clampedZ;
+
+      const toSafe = SAFE_ANCHOR.clone().sub(group.position).normalize();
+      const inwardYaw   = Math.atan2(toSafe.z, toSafe.x);
+      const inwardPitch = Math.atan2(toSafe.y, Math.hypot(toSafe.x, toSafe.z));
+      targetYaw   = lerpAngleShortest(targetYaw, inwardYaw, 0.65);
+      targetPitch = THREE.MathUtils.lerp(targetPitch, inwardPitch, 0.65);
+      speed = THREE.MathUtils.lerp(speed, (minSpeed + maxSpeed) * 0.5, 0.25);
+      escapeCooldown = Math.max(escapeCooldown, 0.9);
+    }
+
+    // Tail wag
+    if (tailHinge) {
+      tailHinge.rotation.y = Math.sin(swimTime * (3.5 + speed * 4.0)) * 0.25;
+    }
+  }
+
+  return { group, update };
+}
+
+/** Add a new fish; optionally provide a home position and a safe anchor (coral top). */
+export function addFish(
+  scene: THREE.Scene,
+  homePos?: THREE.Vector3,
+  safeAnchor?: THREE.Vector3
+): SwimFish {
+  const f = createSwimmer(homePos, safeAnchor);
+  scene.add(f.group);
+  SCHOOL.push(f);
+  return f;
+}
+
+/** Call once per frame from your animate loop. dt = seconds since last frame. */
+export function updateFishes(dt: number) {
+  for (const f of SCHOOL) f.update(dt);
+}
