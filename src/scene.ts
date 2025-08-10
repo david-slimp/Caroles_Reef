@@ -1,24 +1,42 @@
+// src/scene.ts
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { addFish } from "./fish";
+import { addFish, updateFishes } from "./fish";
 import { addCoral } from "./coral";
+
+interface SceneContext {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+}
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
 let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 
-export function initScene() {
+let lastTime = performance.now();
+
+export function initScene(): SceneContext {
   // Scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x002b36);
 
   // Camera
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
   camera.position.set(0, 2, 5);
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, canvas: document.getElementById("reefCanvas") as HTMLCanvasElement });
+  renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    canvas: document.getElementById("reefCanvas") as HTMLCanvasElement,
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
 
@@ -31,7 +49,7 @@ export function initScene() {
   dirLight.position.set(-3, 10, -10);
   scene.add(dirLight);
 
-  // Tank floor
+  // Tank floor (smaller test tank)
   const floorGeo = new THREE.PlaneGeometry(6, 6);
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x553311 });
   const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -39,11 +57,11 @@ export function initScene() {
   floor.position.y = -1;
   scene.add(floor);
 
-  // Starting fish
-  addFish(scene);
-
-  // Starting coral
-  addCoral(scene);
+  // Add coral first and get its position
+  const coral = addCoral(scene);
+  
+  // Create fish with coral position as home
+  const start = addFish(scene, coral.position.clone());
 
   // Controls
   controls = new OrbitControls(camera, renderer.domElement);
@@ -51,7 +69,7 @@ export function initScene() {
 
   window.addEventListener("resize", onWindowResize);
 
-  return { scene, camera, renderer };
+  return { scene, camera, renderer, controls };
 }
 
 function onWindowResize() {
@@ -62,6 +80,13 @@ function onWindowResize() {
 
 export function animate() {
   requestAnimationFrame(animate);
+
+  // --- integrate fish movement ---
+  const now = performance.now();
+  const dt = (now - lastTime) / 1000; // seconds
+  lastTime = now;
+  updateFishes(dt);
+
   controls.update();
   renderer.render(scene, camera);
 }

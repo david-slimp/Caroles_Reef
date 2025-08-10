@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.3] - Unreleased
+### Added
+- New fish model with realistic shape and features
+- Fish now have eyes and proper tail fins
+- More natural fish movement with body undulation
+- Added favicon for better browser tab identification
+
+### Changed
+- Updated fish geometry from box to a more organic shape
+- Improved fish materials and textures
+- Enhanced fish swimming animation
+
 ## [0.0.2] - 2025-08-09
 ### Added
 - Fish movement with natural swimming behavior

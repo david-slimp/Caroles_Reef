@@ -1,60 +1,20 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { addFish, Fish } from './fish';
+import { initScene } from './scene';
+import { addFish, updateFishes, type SwimFish } from './fish';
 import { addCoral } from './coral';
 import { VERSION_DISPLAY } from './config/version';
 
 console.log('Initializing Three.js scene...');
 
+// Initialize the scene
+const sceneContext = initScene();
+const { scene, camera, renderer } = sceneContext;
+
 // Track all fish in the scene
-const fishes: Fish[] = [];
+const fishes: SwimFish[] = [];
 
-// Initialize scene, camera, and renderer
-const scene = new THREE.Scene();
-console.log('Scene created');
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-console.log('Camera created');
-
-const canvas = document.querySelector('#reefCanvas') as HTMLCanvasElement;
-if (!canvas) {
-    console.error('Could not find canvas element with id "reefCanvas"');
-} else {
-    console.log('Canvas found:', canvas);
-}
-
-const renderer = new THREE.WebGLRenderer({
-    canvas: canvas,
-    antialias: true
-});
-console.log('Renderer created');
-
-// Set renderer size and color
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x87CEEB); // Sky blue background
-
-// Add lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(1, 1, 1);
-scene.add(directionalLight);
-
-// Add tank bottom (light golden sandy floor)
-const floorGeometry = new THREE.PlaneGeometry(10, 10);
-const floorMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xf9e4b3, // Lighter, more golden sand color
-    side: THREE.DoubleSide,
-    roughness: 0.9,
-    metalness: 0.1,
-    emissive: 0x333311, // Slight golden tint
-    emissiveIntensity: 0.1
-});
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = -Math.PI / 2; // Rotate to be horizontal
-floor.position.y = -1; // Position at the bottom
-scene.add(floor);
+// Store camera reference in scene for later use
+(scene.userData as { camera: THREE.PerspectiveCamera }).camera = camera;
 
 // Add coral
 console.log('Adding coral...');
@@ -62,84 +22,95 @@ addCoral(scene);
 console.log('Coral added to scene');
 
 // Add initial fish
-console.log('Adding initial fish...');
-addInitialFish();
-console.log('Initial fish added to scene');
-
-// Position camera
-camera.position.set(0, 2, 5);
-camera.lookAt(0, 0, 0);
-
-// Add orbit controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minDistance = 2;
-controls.maxDistance = 15;
-controls.maxPolarAngle = Math.PI / 1.5; // Prevent going below the floor
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// Add initial fish
 function addInitialFish() {
-    // Add 3 fish to start with
     for (let i = 0; i < 3; i++) {
         const x = (Math.random() - 0.5) * 4;  // X range: -2 to 2
         const z = (Math.random() - 0.5) * 4;  // Z range: -2 to 2
         const y = (Math.random() * 2) - 1;    // Y range: -1 to 1
-        const position = new THREE.Vector3(x, y, z);
         
-        const fish = addFish(scene, position);
+        const fish = addFish(scene);
+        fish.group.position.set(x, y, z);
         fishes.push(fish);
     }
 }
 
-// Modified addFish that prevents overlap
+addInitialFish();
+
+// Add fish in front of the camera with collision detection
 function addFishToTank() {
-    const maxAttempts = 50;
+    const maxAttempts = 20; // Reduced since we're targeting a specific area
     let fishAdded = false;
     
+    // Get camera position and direction
+    const camera = (scene.userData as { camera: THREE.PerspectiveCamera }).camera;
+    const cameraPos = camera.position.clone();
+    const cameraDir = new THREE.Vector3();
+    camera.getWorldDirection(cameraDir);
+    
+    // Calculate spawn distance in front of camera
+    const spawnDistance = 2; // Distance in front of camera to spawn
+    const spawnVariance = 1.5; // How much to vary the spawn position
+    
     for (let i = 0; i < maxAttempts && !fishAdded; i++) {
-        // Try to find a non-overlapping position
-        const x = (Math.random() - 0.5) * 4;  // X range: -2 to 2
-        const z = (Math.random() - 0.5) * 4;  // Z range: -2 to 2
-        const y = (Math.random() * 2) - 1;    // Y range: -1 to 1 (increased vertical range)
-        const newPos = new THREE.Vector3(x, y, z);
+        // Calculate base position in front of camera
+        const basePos = cameraPos.clone().add(
+            cameraDir.clone().multiplyScalar(spawnDistance)
+        );
+        
+        // Add some randomness to the spawn position
+        const randomOffset = new THREE.Vector3(
+            (Math.random() - 0.5) * spawnVariance, // X variation
+            (Math.random() - 0.3) * spawnVariance, // Slightly less Y variation
+            (Math.random() - 0.5) * spawnVariance  // Z variation
+        );
+        
+        const newPos = basePos.add(randomOffset);
+        
+        // Ensure position is within tank bounds
+        const tankBounds = {
+            minX: -2.5, maxX: 2.5,
+            minY: -0.9, maxY: 1.0,
+            minZ: -2.5, maxZ: 2.5
+        };
+        
+        newPos.x = Math.max(tankBounds.minX, Math.min(tankBounds.maxX, newPos.x));
+        newPos.y = Math.max(tankBounds.minY, Math.min(tankBounds.maxY, newPos.y));
+        newPos.z = Math.max(tankBounds.minZ, Math.min(tankBounds.maxZ, newPos.z));
         
         // Check distance from other fish
         const minDistance = 0.5; // Minimum distance between fish
-        const tooClose = fishes.some(fish => fish.mesh.position.distanceTo(newPos) < minDistance);
+        const tooClose = fishes.some(fish => {
+            const fishPos = fish.group.position;
+            return fishPos.distanceTo(newPos) < minDistance;
+        });
         
         if (!tooClose) {
             // Add fish at this position
-            const fish = addFish(scene, newPos);
+            const fish = addFish(scene);
+            fish.group.position.copy(newPos);
             fishes.push(fish);
             fishAdded = true;
         }
     }
     
     if (!fishAdded) {
-        console.warn('Could not find a good position for the fish');
+        console.warn('Could not find a good position for the fish near the camera');
     }
 }
 
 // Animation loop
-function animate(time: number) {
-    requestAnimationFrame(animate);
+function animationLoop(time: number) {
+    requestAnimationFrame(animationLoop);
     
     // Calculate delta time for smooth animation
-    const deltaTime = Math.min(0.1, (time - lastTime) / 1000); // Cap delta time to prevent large jumps
+    const delta = Math.min(0.1, (time - lastTime) / 1000); // Cap delta time to prevent large jumps
     lastTime = time;
     
-    // Update all fish
-    fishes.forEach(fish => fish.update(deltaTime));
+    // Update all fish using the centralized update function
+    updateFishes(delta);
     
     // Update controls and render
-    controls.update();
+    sceneContext.controls?.update();
     renderer.render(scene, camera);
 }
 
@@ -149,7 +120,7 @@ let lastTime = 0;
 // Start the animation loop
 requestAnimationFrame((time) => {
     lastTime = time;
-    animate(time);
+    animationLoop(time);
 });
 
 // Add event listener for Add Fish button
