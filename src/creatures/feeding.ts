@@ -6,7 +6,7 @@ import { getSpecies } from "./registry";
 import { getEnv } from "../core/env";
 import { FEEDING } from "./constants";
 
-export function handleFeeding(c: CreatureBase){
+export async function handleFeeding(c: CreatureBase){
   const spec = getSpecies(c.speciesId);
   const env = getEnv();
 
@@ -35,8 +35,23 @@ export function handleFeeding(c: CreatureBase){
       // consume pellet
       const idx = env.pellets.indexOf(bestPellet);
       if(idx>=0) env.pellets.splice(idx,1);
-      // grow
-      c.size = Math.min(c.size + FEEDING.GROWTH_PER_PELLET, c.maxSize);
+      // grow and update collection
+      const newSize = Math.min(c.size + FEEDING.GROWTH_PER_PELLET, c.maxSize);
+      if (newSize !== c.size) {
+        c.size = newSize;
+        // If this fish is from the collection, update it there too
+        if (c.originalId) {
+          try {
+            const { updateFishProperties } = await import('../entities/fish');
+            await updateFishProperties(c, {
+              size: newSize,
+              lastUpdated: new Date().toISOString()
+            }, true);
+          } catch (error) {
+            console.error('Error updating fish size in collection:', error);
+          }
+        }
+      }
       spec.hooks?.onEat?.(c, bestPellet);
       return; // done this frame
     }
@@ -50,8 +65,23 @@ export function handleFeeding(c: CreatureBase){
       if(bestCorpse._corpseArea == null) bestCorpse._corpseArea = Math.PI * 100; // default area if not set
       const biteArea = Math.PI * FEEDING.CORPSE_BITE_RADIUS * FEEDING.CORPSE_BITE_RADIUS;
       bestCorpse._corpseArea = Math.max(0, bestCorpse._corpseArea - biteArea);
-      // eater grows a bit
-      c.size = Math.min(c.size + FEEDING.CORPSE_GROWTH, c.maxSize);
+      // eater grows a bit and update collection
+      const newSize = Math.min(c.size + FEEDING.CORPSE_GROWTH, c.maxSize);
+      if (newSize !== c.size) {
+        c.size = newSize;
+        // If this fish is from the collection, update it there too
+        if (c.originalId) {
+          try {
+            const { updateFishProperties } = await import('../entities/fish');
+            await updateFishProperties(c, {
+              size: newSize,
+              lastUpdated: new Date().toISOString()
+            }, true);
+          } catch (error) {
+            console.error('Error updating fish size in collection:', error);
+          }
+        }
+      }
       // flee from corpse
       c._fleeFromX = bestCorpse.x; c._fleeFromY = bestCorpse.y; c._fleeDistLeft = FEEDING.FLEE_DIST_PIXELS; c.state = "flee";
       return;

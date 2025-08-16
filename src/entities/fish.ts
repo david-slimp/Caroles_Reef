@@ -304,6 +304,64 @@ export function pickFish(x,y){
 }
 
 /* ---------------- update loop ---------------- */
+/**
+ * Updates a fish's properties and persists changes to local storage if needed
+ * @param {Object} fish - The fish object to update
+ * @param {Object} updates - Object containing properties to update
+ * @param {boolean} [forceUpdate=false] - Whether to force an update even if values haven't changed
+ */
+interface FishUpdate {
+  [key: string]: any;
+  size?: number;
+  health?: number;
+  lastUpdated?: string;
+}
+
+/**
+ * Updates a fish's properties and persists changes to local storage if needed
+ * @param {Object} fish - The fish object to update
+ * @param {FishUpdate} updates - Object containing properties to update
+ * @param {boolean} [forceUpdate=false] - Whether to force an update even if values haven't changed
+ */
+async function updateFishProperties(
+  fish: any, 
+  updates: FishUpdate, 
+  forceUpdate: boolean = false
+): Promise<boolean> {
+  if (!fish) return false;
+  
+  // Check if this is a size update that would be visible in the collection
+  const isSizeUpdate = 'size' in updates && fish.size !== updates.size;
+  
+  // Apply updates to the fish
+  Object.assign(fish, updates);
+  
+  // If this fish is from the collection, update it there too
+  if (fish.originalId) {
+    // Don't debounce if this is a size update or forced
+    const now = Date.now();
+    if (forceUpdate || isSizeUpdate || !fish._lastUpdateTime || now - (fish._lastUpdateTime as number) > 2000) {
+      await updateFishInCollection(fish);
+      fish._lastUpdateTime = now;
+      
+      // If this is a size update and the collection is open, refresh it
+      if (isSizeUpdate || forceUpdate) {
+        try {
+          const { fishCollection } = await import('../ui/FishCollection');
+          if (fishCollection.isVisible()) {
+            // Small delay to ensure the collection has time to register the storage update
+            setTimeout(() => fishCollection.refreshCollection(), 100);
+          }
+        } catch (error) {
+          console.error('Error refreshing collection view:', error);
+        }
+      }
+    }
+  }
+  
+  return true;
+}
+
 // Function to update fish in the collection
 async function updateFishInCollection(updatedFish) {
   if (!updatedFish.originalId) return; // Skip if not from collection
@@ -317,26 +375,45 @@ async function updateFishInCollection(updatedFish) {
     const fishIndex = savedFish.findIndex(fish => fish.id === updatedFish.originalId);
     
     if (fishIndex !== -1) {
+      // Get current time for the update timestamp
+      const now = new Date().toISOString();
+      
+      // Track if this is a size increase
+      const isGrowing = updatedFish.size > (savedFish[fishIndex].fishData.size || 0);
+      
       // Create updated fish data with all current properties
       const updatedData = {
         ...savedFish[fishIndex],
+        lastUpdated: now,
         fishData: {
           ...savedFish[fishIndex].fishData, // Keep all existing data
           ...updatedFish,                   // Override with updated properties
           id: savedFish[fishIndex].fishData.id, // Preserve original ID
-          originalId: savedFish[fishIndex].fishData.originalId // Preserve originalId
+          originalId: savedFish[fishIndex].fishData.originalId, // Preserve originalId
+          lastFed: updatedFish.lastFed || savedFish[fishIndex].fishData.lastFed,
+          lastGrew: isGrowing ? now : (savedFish[fishIndex].fishData.lastGrew || now),
+          lastUpdated: now
         }
       };
       
-      // Update in the saved fish array
-      savedFish[fishIndex] = updatedData;
+      // Check if there are actual changes to save
+      const hasChanges = JSON.stringify(savedFish[fishIndex]) !== JSON.stringify(updatedData);
       
-      // Save back to localStorage
-      localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
-      
-      // Force refresh the collection view if it's open
-      if (fishCollection.isVisible()) {
-        fishCollection.refreshCollection();
+      if (hasChanges) {
+        // Update in the saved fish array
+        savedFish[fishIndex] = updatedData;
+        
+        try {
+          // Save back to localStorage
+          localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
+          
+          // Force refresh the collection view if it's open
+          if (fishCollection.isVisible()) {
+            fishCollection.refreshCollection();
+          }
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
       }
     }
   } catch (error) {
@@ -344,23 +421,29 @@ async function updateFishInCollection(updatedFish) {
   }
 }
 
-export function updateFish(f, dt){
+export async function updateFish(f, dt){
   const { W, H } = env.getSize();
   const pellets = env.pellets;
   
   // Store previous size to detect changes
   const prevSize = f.size;
 
-  if (f._maxAge == null) f._maxAge = computeMaxAgeSeconds(typeof f.constitution==='number'? f.constitution : 5);
+  if (f._maxAge == null) {
+    await updateFishProperties(f, {
+      _maxAge: computeMaxAgeSeconds(typeof f.constitution === 'number' ? f.constitution : 5)
+    });
+  }
+  
+  // Update age
   f.age += dt;
   
   // Check if fish stats have changed significantly and need to be saved
   if (f.originalId && (f.size !== prevSize || f.health <= 0)) {
-    // Debounce updates to prevent excessive saves
-    if (!f._lastUpdateTime || Date.now() - f._lastUpdateTime > 5000) {
-      updateFishInCollection(f);
-      f._lastUpdateTime = Date.now();
-    }
+    await updateFishProperties(f, {
+      size: f.size,
+      health: f.health,
+      lastUpdated: new Date().toISOString()
+    }, true);
   }
 
   /* ---- corpse float + despawn early return ---- */
@@ -657,12 +740,12 @@ export function updateFish(f, dt){
     for(let i=pellets.length-1;i>=0;i--){
       const p = pellets[i];
       if(Math.hypot(p.x-f.x,p.y-f.y) < Math.max(12,f.size*0.85)){
-        const prevSize = f.size;
-        f.size = Math.min(f.size + 2, f.maxSize);
-        
-        // If the fish grew and it's from the collection, update local storage
-        if (f.originalId && f.size > prevSize) {
-          updateFishInCollection(f);
+        const newSize = Math.min(f.size + 2, f.maxSize);
+        if (newSize > f.size) {
+          updateFishProperties(f, {
+            size: newSize,
+            lastFed: new Date().toISOString()
+          });
         }
         
         pellets.splice(i,1);
@@ -700,12 +783,11 @@ export function updateFish(f, dt){
         if (c._corpseArea !== undefined) c._corpseArea -= biteArea;
 
         // eater grows a bit
-        const prevSize = f.size;
-        f.size = Math.min(f.size + CORPSE.BITE_GROWTH, f.maxSize);
-        
-        // If the fish grew and it's from the collection, update local storage
-        if (f.originalId && f.size > prevSize) {
-          updateFishInCollection(f);
+        const newSize = Math.min(f.size + CORPSE.BITE_GROWTH, f.maxSize);
+        if (newSize > f.size) {
+          updateFishProperties(f, {
+            size: newSize
+          });
         }
 
         // flee away

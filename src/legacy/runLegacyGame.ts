@@ -401,10 +401,42 @@ export function runLegacyGame(canvasId: string = 'c') {
     const saveToCollectionBtn = fishCard.querySelector('#saveToCollection');
   
   
-    save.onclick = () => {
-      f.name = input.value.trim();
+    save.onclick = async () => {
+      const newName = input.value.trim();
+      if (!newName) return;
+      
+      f.name = newName;
       toast('Fish renamed');
-      // no full rebuild; just live refresh
+      
+      // If this fish is in the collection, update it there too
+      if (f.originalId) {
+        try {
+          // Import the fish collection to access the update function
+          const { fishCollection } = await import('../ui/FishCollection');
+          const savedFish = fishCollection.getSavedFish();
+          const fishIndex = savedFish.findIndex(fish => fish.id === f.originalId || fish.id === f.id);
+          
+          if (fishIndex !== -1) {
+            // Update the fish name in the saved collection
+            savedFish[fishIndex].name = newName;
+            if (savedFish[fishIndex].fishData) {
+              savedFish[fishIndex].fishData.name = newName;
+            }
+            
+            // Save back to localStorage
+            localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
+            
+            // Refresh the collection view if it's open
+            if (fishCollection.isVisible()) {
+              fishCollection.refreshCollection();
+            }
+          }
+        } catch (error) {
+          console.error('Error updating fish name in collection:', error);
+        }
+      }
+      
+      // Refresh the fish card
       refreshFishCard(); 
     };
   

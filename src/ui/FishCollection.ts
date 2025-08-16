@@ -120,6 +120,28 @@ class FishCollection {
           min-width: 150px;
         }
         
+        .name.editable {
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 3px;
+          transition: background-color 0.2s;
+        }
+        
+        .name.editable:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .fish-name-input {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: white;
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-family: inherit;
+          font-size: inherit;
+          outline: none;
+        }
+        
         .fish-name-cell {
           display: flex;
           align-items: center;
@@ -248,9 +270,12 @@ class FishCollection {
     document.getElementById('closeCollection')?.addEventListener('click', () => this.hide());
     document.getElementById('closeCollectionBtn')?.addEventListener('click', () => this.hide());
     
-    // Use event delegation for delete buttons
+    // Add event delegation for all interactive elements
     this.panel?.addEventListener('click', (e) => {
-      const deleteBtn = (e.target as HTMLElement).closest('.btn-delete');
+      const target = e.target as HTMLElement;
+      
+      // Handle delete button clicks
+      const deleteBtn = target.closest('.btn-delete');
       if (deleteBtn) {
         e.preventDefault();
         e.stopPropagation();
@@ -259,6 +284,17 @@ class FishCollection {
           if (confirm('Are you sure you want to remove this fish from your collection?')) {
             this.removeFish(fishId);
           }
+        }
+        return;
+      }
+      
+      // Handle name clicks for editing
+      const nameElement = target.closest('.name.editable') as HTMLElement;
+      if (nameElement) {
+        e.stopPropagation();
+        const fishId = nameElement.getAttribute('data-fish-id');
+        if (fishId) {
+          this.startRenamingFish(fishId, nameElement);
         }
       }
     });
@@ -299,8 +335,8 @@ class FishCollection {
           <button class="btn-add" id="select-fish-${fish.id}" title="Add to tank">+</button>
         </td>
         <td class="fish-name">
-          <div class="fish-name-cell">
-            <span class="name">${fishName}</span>
+          <div class="fish-name-cell" data-fish-id="${fish.id}">
+            <span class="name editable" data-fish-id="${fish.id}" title="Click to rename">${fishName}</span>
             ${indicators ? `<span class="indicators">${indicators}</span>` : ''}
           </div>
         </td>
@@ -396,6 +432,130 @@ class FishCollection {
         toast.remove();
       }, 3000);
     }, 100);
+  }
+  
+  /**
+   * Start renaming a fish
+   */
+  private startRenamingFish(fishId: string, nameElement: HTMLElement): void {
+    const savedFish = this.getSavedFish();
+    const fish = savedFish.find(f => f.id === fishId);
+    if (!fish) return;
+    
+    const currentName = fish.name || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'fish-name-input';
+    input.style.width = `${Math.max(100, currentName.length * 8)}px`;
+    
+    // Replace the name with an input field
+    nameElement.replaceWith(input);
+    input.focus();
+    
+    // Select all text in the input
+    input.select();
+    
+    // Handle input submission
+    const handleSubmit = () => {
+      const newName = input.value.trim();
+      if (newName && newName !== currentName) {
+        this.renameFish(fishId, newName);
+      } else {
+        // Revert to original name if empty or unchanged
+        const span = document.createElement('span');
+        span.className = 'name editable';
+        span.setAttribute('data-fish-id', fishId);
+        span.textContent = currentName;
+        span.title = 'Click to rename';
+        input.replaceWith(span);
+      }
+    };
+    
+    // Handle Enter key or blur
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      } else if (e.key === 'Escape') {
+        const span = document.createElement('span');
+        span.className = 'name editable';
+        span.setAttribute('data-fish-id', fishId);
+        span.textContent = currentName;
+        span.title = 'Click to rename';
+        input.replaceWith(span);
+      }
+    });
+    
+    input.addEventListener('blur', handleSubmit);
+  }
+  
+  /**
+   * Rename a fish in the collection and update all references
+   */
+  private renameFish(fishId: string, newName: string): boolean {
+    try {
+      const savedFish = this.getSavedFish();
+      const fishIndex = savedFish.findIndex(f => f.id === fishId);
+      
+      if (fishIndex === -1) return false;
+      
+      // Get the original fish data
+      const fishData = savedFish[fishIndex];
+      const originalId = fishData.fishData.originalId || fishData.fishData.id;
+      
+      // Update the fish name in the collection
+      fishData.name = newName;
+      fishData.fishData.name = newName;
+      
+      // Save back to localStorage
+      localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
+      
+      // Update the fish in the tank if it exists
+      try {
+        const env = (window as any).env;
+        if (env && Array.isArray(env.fish)) {
+          // Find the fish in the tank by originalId or id
+          const tankFish = env.fish.find((f: any) => 
+            f.originalId === originalId || f.id === originalId || f.id === fishId
+          );
+          
+          if (tankFish) {
+            // Update the fish name in the tank
+            tankFish.name = newName;
+            
+            // If the fish card is open for this fish, update its name
+            const fishCard = document.getElementById('fishCard');
+            if (fishCard && fishCard.style.display === 'block') {
+              const nameElement = fishCard.querySelector('#fc-name');
+              if (nameElement) {
+                nameElement.textContent = newName || 'Unnamed Fish';
+              }
+              
+              // Also update the input field if it's currently being edited
+              const inputElement = fishCard.querySelector('input[type="text"]') as HTMLInputElement;
+              if (inputElement && inputElement.id === 'renameFish') {
+                inputElement.value = newName;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error updating fish in tank:', error);
+      }
+      
+      // Update the UI
+      this.refreshCollection();
+      
+      // Show success message
+      this.showNotification('Fish renamed successfully');
+      
+      return true;
+    } catch (error) {
+      console.error('Error renaming fish:', error);
+      this.showNotification('Failed to rename fish', true);
+      return false;
+    }
   }
   
   /**

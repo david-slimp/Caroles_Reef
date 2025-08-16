@@ -8,6 +8,10 @@
   - Now correctly identifies and removes the selected fish instead of checking health
   - Properly cleans up fish tracking in tankFishIds
   - Ensures the fish card is properly closed after release
+- Updated deployment script to skip strict type checking during builds
+  - Added `--noEmitOnError false` flag to Vite build command
+  - Increased Node.js memory limit to prevent OOM errors
+  - Added comments for better maintainability
 
 ## [0.0.7] - 2025-08-15
 
