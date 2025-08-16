@@ -1,0 +1,13 @@
+{
+  "id": "seahorse",
+  "displayName": "Seahorse",
+  "defaultGenes": {
+    "speed": 3,
+    "senseRadius": 100,
+    "hungerDrive": 4,
+    "rarityGene": 3,
+    "colorHue": 40,
+    "patternType": "solid"
+  },
+  "renderer": "fishRenderer"
+}

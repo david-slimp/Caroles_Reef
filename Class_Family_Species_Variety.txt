@@ -1,0 +1,39 @@
+Carole's Reef game
+
+How do animals relate / breed
+
+CFSV (Class/Family/Sepcies/Variety) creature classifications.
+
+Class and Family cannot interbreed
+Species and Variety can interbreed and give possible mutations in a range
+
+
+Class				CANNOT interbreed
+Class				Aquarium / Ocean Examples
+ray-finned fishes		Blue tang, clownfish, Lionfish, Seahorse
+sharks & rays			Blacktip reef shark, Nurse shark, Manta ray, Southern stingray
+octopus, squid, cuttlefish	Common octopus, Giant Pacific octopus, Common cuttlefish, Bigfin reef squid
+Mammalia (marine)		Bottlenose dolphin, Harbor seal, Sea otter, Humpback whale
+Crust (crustaceans)		shrimp, krill, barnalces, pillbugs, remipedes
+
+Family					CANNOT interbreed
+Family					Examples (species in that family)
+damselfishes & clownfishes)		clownfish, Domino damselfish, Sergeant major, Garibaldi
+surgeonfishes/tangs			Blue tang, Yellow tang, Powder blue tang, Naso tang
+Labridae (wrasses)			Cleaner wrasse, Six-line wrasse, Bird wrasse, Solar fairy wrasse
+seahorses, pipefishes, seadragons	Lined seahorse, Dwarf seahorse, Weedy seadragon, Bluestripe pipefish
+10foot					shrimp, lobster, crab, krill
+
+Species				CAN interbreed
+Species				Example varieties / morphs
+clownfish			Snowflake, Black Ice, Darwin (all-black), Wyoming White
+Betta splendens (betta)		Halfmoon, Crowntail, Plakat, Double Tail
+guppy				Cobra, Moscow, Tuxedo, Dumbo Ear
+dwarf shrimp			Cherry, Sakura, Fire Red, Blue Dream
+
+Variety				CAN interbreed
+Variety set (by species)	Examples
+Goldfish			Oranda, Ryukin, Ranchu, Telescope
+Koi (domesticated carp)		Kohaku, Sanke, Showa, Shusui
+Clownfish			Picasso, Platinum, Onyx, Naked
+Molly				Black, Dalmatian, Lyretail, Balloon

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carole's Reef</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="/Caroles_Reef-2D/favicon.ico" type="image/x-icon" />
+    
+    <link rel="stylesheet" href="style.css" />
+    
+    <!-- Audio interaction handler -->
+    <script>
+      // This will be called when the user interacts with the page
+      function handleFirstInteraction() {
+        // Remove this event listener after first interaction
+        document.removeEventListener('click', handleFirstInteraction);
+        document.removeEventListener('keydown', handleFirstInteraction);
+        
+        // Dispatch a custom event that our game can listen for
+        const event = new Event('userInteraction');
+        document.dispatchEvent(event);
+      }
+      
+      // Listen for both click and keydown to cover most interaction types
+      document.addEventListener('click', handleFirstInteraction);
+      document.addEventListener('keydown', handleFirstInteraction);
+    </script>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="ui">
+      <div class="topbar">
+        <strong>Carole's Reef — 0.0.7</strong>
+        <span class="pill" id="pop">Fish: 0</span>
+        <span class="pill" id="gen">Gen: 1</span>
+        <span class="pill" id="disc">Discovered: 0</span>
+        <div class="spacer"></div>
+        <button id="btnFood">Feed (F)</button>
+        <button id="btnDecor">Decor</button>
+        <button id="btnTheme">Theme</button>
+        <button id="btnDex">Encyclopedia</button>
+        <button id="btnCollection">View Collection</button>
+        <div class="audio-controls">
+          <button id="btnMuteSfx" class="mute-btn" title="Toggle Sound Effects">
+            <span class="sound-icon">🔊</span>
+          </button>
+          <button id="btnMuteMusic" class="mute-btn" title="Toggle Music">
+            <span class="music-icon">🎵</span>
+          </button>
+        </div>
+        <label class="small"><input type="checkbox" id="pause" /> Pause</label>
+      </div>
+
+      <div id="panelDecor" class="panel">
+        <h3>Decorations</h3>
+        <div class="notice">Click in the tank to place the selected decor.</div>
+        <div class="row">
+          <label>Type</label>
+          <select id="decorType">
+            <option value="plant">Plant (+bravery)</option>
+            <option value="coral">Coral (+mutation)</option>
+            <option value="rock">Rock (hiding)</option>
+            <option value="chest">Treasure (cosmetic)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Size</label>
+          <select id="decorSize">
+            <option value="s">Small</option>
+            <option value="m" selected>Medium</option>
+            <option value="l">Large</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="small">Tip: Place coral near breeders to boost rare traits.</span>
+        </div>
+      </div>
+
+      <div id="panelTheme" class="panel">
+        <h3>Theme</h3>
+        <div class="row">
+          <button data-theme="day">Daylight</button>
+          <button data-theme="dusk">Dusk</button>
+          <button data-theme="night">Night</button>
+          <button data-theme="sunset">Sunset</button>
+          <button data-theme="super-night">Super Night</button>
+          <button data-theme="mermaid-glow">Mermaid Glow</button>
+        </div>
+        <div class="row">
+          <label>Bubble Level</label
+          ><input id="bubbleLevel" type="range" min="0" max="1" step="0.01" value="0.6" />
+        </div>
+        <div class="row">
+          <label>Time Speed</label
+          ><input id="timeSpeed" type="range" min="0.2" max="3" step="0.1" value="1" />
+        </div>
+      </div>
+
+      <div id="panelDex" class="panel">
+        <h3>Fish Encyclopedia</h3>
+        <div id="dexList" class="small"></div>
+      </div>
+
+      <div id="fishCard"></div>
+      <div id="toast"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

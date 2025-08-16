@@ -1,0 +1,584 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+}
+
+#c {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.topbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  z-index: 3;
+}
+/* Audio controls styles */
+.audio-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.mute-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.mute-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mute-btn.muted {
+  opacity: 0.5;
+  border-color: rgba(255, 0, 0, 0.5);
+}
+
+.mute-btn .sound-icon,
+.mute-btn .music-icon {
+  font-size: 1.1em;
+  transition: opacity 0.2s ease;
+}
+
+.topbar button,
+.topbar select,
+.topbar input[type='checkbox'] {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.topbar button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Mute button specific styles */
+#btnMute {
+  width: 36px;
+  padding: 6px 0;
+  text-align: center;
+  font-size: 1.1em;
+}
+
+#btnMute.muted {
+  opacity: 0.7;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #ff4444;
+}
+.panel {
+  position: absolute;
+  top: 56px;
+  left: 8px;
+  width: 300px;
+  max-height: calc(100% - 64px);
+  overflow: auto;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  padding: 10px;
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  display: none;
+  z-index: 4;
+}
+.panel h3 {
+  margin: 6px 0 8px;
+  font-size: 16px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0;
+  gap: 6px;
+}
+.small {
+  font-size: 12px;
+  opacity: 0.9;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 2px;
+}
+.pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.notice {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.spacer {
+  flex: 1;
+}
+/* Fish Collection Panel */
+#fishCollectionPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 1000px;
+  max-height: 80vh;
+  background: rgba(30, 35, 40, 0.95);
+  border: 2px solid #4a90e2;
+  border-radius: 12px;
+  padding: 20px;
+  color: #fff;
+  z-index: 1000;
+  overflow-y: auto;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+#fishCollectionPanel h3 {
+  margin-top: 0;
+  color: #4a90e2;
+  border-bottom: 1px solid #4a90e2;
+  padding-bottom: 10px;
+}
+
+.fish-collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.fish-collection-panel .fish-card {
+  background: rgba(30, 35, 45, 0.8);
+  border-radius: 10px;
+  padding: 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.fish-collection-panel .fish-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.fish-card-header {
+  display: flex;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fish-thumbnail {
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fish-basic-info {
+  flex-grow: 1;
+  margin-left: 16px;
+  min-width: 0;
+}
+
+.fish-basic-info h4 {
+  margin: 0 0 6px 0;
+  font-size: 1.1em;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fish-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8em;
+  color: #a0a8b8;
+  margin-bottom: 8px;
+}
+
+.species {
+  color: #8ab4f8;
+}
+
+.generation {
+  background: rgba(138, 180, 248, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+}
+
+.shiny-badge {
+  background: linear-gradient(45deg, #ffd700, #ff9d00);
+  color: #000;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7em;
+  font-weight: bold;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+.fish-stats-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.stat {
+  text-align: center;
+  flex: 1;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.7em;
+  color: #8a9ba8;
+  margin-bottom: 2px;
+}
+
+.stat-value {
+  display: block;
+  font-weight: bold;
+  font-size: 0.9em;
+  color: #fff;
+}
+
+.fish-details {
+  padding: 16px;
+  background: rgba(20, 25, 35, 0.6);
+}
+
+.detail-section {
+  margin-bottom: 16px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section h5 {
+  margin: 0 0 10px 0;
+  color: #8ab4f8;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.attribute {
+  font-size: 0.85em;
+}
+
+.attr-name {
+  display: block;
+  color: #a0a8b8;
+  margin-bottom: 2px;
+}
+
+.attr-value {
+  font-weight: bold;
+  color: #fff;
+  margin-right: 8px;
+  min-width: 30px;
+  display: inline-block;
+  text-align: right;
+}
+
+.attr-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.attr-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: calc(var(--value, 0) * 1%);
+  background: #4c9eff;
+  border-radius: 3px;
+}
+
+.attr-bar.health::after {
+  background: #4caf50;
+}
+
+.attr-bar.energy::after {
+  background: #ffc107;
+}
+
+.appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.appearance-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+}
+
+.appearance-label {
+  color: #a0a8b8;
+  min-width: 60px;
+}
+
+.appearance-value {
+  color: #fff;
+  font-weight: 500;
+}
+
+.color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.fish-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.btn-add, .btn-delete {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-add {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-add:hover {
+  background: #3d8b40;
+}
+
+.btn-delete {
+  background: rgba(255, 75, 75, 0.2);
+  color: #ff4b4b;
+}
+
+.btn-delete:hover {
+  background: rgba(255, 75, 75, 0.3);
+}
+
+.btn-icon {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.save-date {
+  font-size: 0.75em;
+  color: #6b7280;
+  text-align: right;
+  margin-top: 8px;
+}
+
+.fish-card-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.fish-card-actions button {
+  flex: 1;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background-color 0.2s;
+}
+
+.btn-select {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.btn-select:hover {
+  background-color: #3a7bc8;
+}
+
+.btn-delete {
+  width: 36px;
+  background-color: #e74c3c;
+  color: white;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+}
+
+.collection-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collection-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.collection-actions button:first-child {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.collection-actions button:first-child:hover {
+  background-color: #3a7bc8;
+}
+
+.collection-actions button.danger {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.collection-actions button.danger:hover {
+  background-color: #c0392b;
+}
+
+.no-fish {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+  font-style: italic;
+  grid-column: 1 / -1;
+}
+
+/* Fish Card */
+#fishCard {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow: auto;
+  display: none;
+  backdrop-filter: blur(6px);
+  z-index: 5;
+}
+#fishCard input[type='text'] {
+  width: 100%;
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  margin-top: 6px;
+}
+#toast {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 16px;
+  border-radius: 10px;
+  display: none;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  max-width: 80%;
+  text-align: right;
+}
+canvas {
+  display: block;
+}

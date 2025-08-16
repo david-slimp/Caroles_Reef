@@ -1,0 +1,130 @@
+# ======================
+# OS-Specific (Linux)
+# ======================
+drafts/
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+*.tmp
+*.bak
+
+# ======================
+# Logs & Debug
+# ======================
+logs/
+tmp/
+*.log
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+report.*.json
+
+# ======================
+# Runtime Data & PIDs
+# ======================
+pids/
+*.pid
+*.pid.lock
+*.seed
+
+# ======================
+# Build Artifacts & Temp
+# ======================
+build/
+dist/
+out/
+lib-cov/
+.cache/
+.parcel-cache/
+.temp/
+.webpack/
+.fusebox/
+.docusaurus/
+.svelte-kit/
+.vuepress/dist
+
+# ======================
+# Dependency Folders
+# ======================
+node_modules/
+jspm_packages/
+bower_components/
+web_modules/
+
+# ======================
+# Caches
+# ======================
+.nyc_output/
+.rpt2_cache/
+.rts2_cache_*/
+.eslintcache
+.stylelintcache
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+.tsbuildinfo
+
+# ======================
+# Configuration / Environment
+# ======================
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+.yarn-integrity
+
+# ======================
+# MySQL / Database files
+# ======================
+*.sql
+*.sqlite
+*.db
+
+# ======================
+# Editor / IDE Files
+# ======================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Windsurf AI IDE (hypothetical paths, adjust if needed)
+.windsurf/
+.windsurf-cache/
+windsurf-workspace.json
+
+# ======================
+# Deployment
+# ======================
+.netlify/
+
+# ======================
+# Miscellaneous
+# ======================
+*.tgz
+.lock-wscript
+.node_repl_history
+.dynamodb/
+.tern-port
+.vscode-test/
+.pnp.js
+
+
+# Deployment scripts
+deploy.sh

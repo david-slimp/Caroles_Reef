@@ -1,0 +1,10 @@
+{
+  "species": [
+    {
+      "path": "/src/data/creatures/fish.json"
+    },
+    {
+      "path": "/src/data/creatures/seahorse.json"
+    }
+  ]
+}

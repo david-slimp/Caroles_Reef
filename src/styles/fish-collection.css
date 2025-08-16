@@ -1,0 +1,173 @@
+/* Fish Collection Panel */
+#fishCollectionPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  max-width: 900px;
+  max-height: 80vh;
+  background: rgba(30, 35, 40, 0.95);
+  border: 2px solid #4a90e2;
+  border-radius: 8px;
+  padding: 20px;
+  color: #fff;
+  z-index: 1000;
+  overflow-y: auto;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+#fishCollectionPanel h3 {
+  margin-top: 0;
+  color: #4a90e2;
+  border-bottom: 1px solid #4a90e2;
+  padding-bottom: 10px;
+}
+
+.fish-collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin: 15px 0;
+}
+
+.fish-card {
+  background: rgba(50, 55, 65, 0.8);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #3a3f4a;
+}
+
+.fish-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.fish-card-thumbnail {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  background: #2a2f3a;
+}
+
+.fish-card-thumbnail img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.fish-card-info {
+  padding: 12px;
+}
+
+.fish-card-info h4 {
+  margin: 0 0 8px 0;
+  color: #4a90e2;
+}
+
+.fish-card-info p {
+  margin: 4px 0;
+  font-size: 0.9em;
+  color: #ddd;
+}
+
+.fish-card-info .save-date {
+  font-size: 0.8em;
+  color: #888;
+  margin-top: 8px;
+}
+
+.fish-card-actions {
+  display: flex;
+  padding: 0 12px 12px 12px;
+  gap: 8px;
+}
+
+.fish-card-actions button {
+  flex: 1;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.btn-select {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.btn-select:hover {
+  background-color: #3a7bc8;
+}
+
+.btn-delete {
+  background-color: #e74c3c;
+  color: white;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+}
+
+.collection-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #3a3f4a;
+}
+
+.collection-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.collection-actions button.danger {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.collection-actions button.danger:hover {
+  background-color: #c0392b;
+}
+
+/* Toast notifications */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 4px;
+  z-index: 2000;
+  transition: transform 0.3s ease-in-out;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Empty state */
+.no-fish {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 30px;
+  color: #888;
+  font-style: italic;
+}
