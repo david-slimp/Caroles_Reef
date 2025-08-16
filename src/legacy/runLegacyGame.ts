@@ -494,16 +494,21 @@ export function runLegacyGame(canvasId: string = 'c') {
 
     // Release button handler
     releaseBtn.onclick = () => {
+      if (!selectedFish) return;
+      
       // Play sound with 1000ms fade out at the end
       playSound(Sounds.release, { fadeOutDuration: 1000 });
-      // Remove fish from the array
-      for (let i = fish.length - 1; i >= 0; i--) {
-        const f = fish[i];
-        if (f.health <= 0) {
-          tankFishIds.delete(f.originalId || f.id);
-          fish.splice(i, 1);
-        }
+      
+      // Find and remove the selected fish
+      const index = fish.findIndex(f => f.id === selectedFish.id);
+      if (index !== -1) {
+        // Remove from tankFishIds if it exists
+        tankFishIds.delete(selectedFish.originalId || selectedFish.id);
+        // Remove from fish array
+        fish.splice(index, 1);
       }
+      
+      // Close the fish card and clear selection
       fishCard.style.display = 'none';
       selectedFish = null;
       toast('Fish has been released!');

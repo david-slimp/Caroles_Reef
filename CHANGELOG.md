@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.8] - 2025-08-15
+
+### Fixed
+
+- Fixed release button in FishCard to properly remove selected fish from the tank
+  - Now correctly identifies and removes the selected fish instead of checking health
+  - Properly cleans up fish tracking in tankFishIds
+  - Ensures the fish card is properly closed after release
+
 ## [0.0.7] - 2025-08-15
 
 ### Fixed
