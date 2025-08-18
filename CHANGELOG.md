@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Enhanced fish collection table with sortable columns
+  - Added sorting functionality for Name, ID, Age, Size, Speed, Sense, Hue, Fins, and Pattern columns
+  - Visual indicators (↑↓) show current sort column and direction
+  - Clicking the same column toggles between ascending and descending order
+
+### Fixed
+
+- Fixed speed column sorting in fish collection
+  - Improved handling of numeric values for consistent sorting
+  - Added debug logging for troubleshooting sorting issues
+  - Ensured proper type conversion for all sortable fields
+  - Added fallback mechanisms for missing or invalid data
+
+
 ## [0.0.8] - 2025-08-15
 
 ### Fixed
