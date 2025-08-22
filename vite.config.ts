@@ -17,7 +17,7 @@ export default defineConfig({
 
   // Development server configuration
   server: {
-    port: 8000,
+    port: 8080,
     open: true,
     host: true, // Listen on all network interfaces
   },

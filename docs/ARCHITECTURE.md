@@ -1,8 +1,8 @@
-# Carole's Reef 2D - Architecture
+# Carole's Reef - Architecture
 
 ## Overview
 
-Carole's Reef is a 2D aquarium simulation featuring procedurally generated fish with genetic traits. This document outlines the high-level architecture and design decisions.
+Carole's Reef is an aquarium simulation featuring procedurally generated fish with genetic traits. This document outlines the high-level architecture and design decisions.
 
 ## Core Concepts
 

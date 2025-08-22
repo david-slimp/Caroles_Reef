@@ -41,7 +41,15 @@ export interface SpeciesConfig {
   breedable: boolean;
   diet: "pellets" | "scavenger" | "predator" | "omnivore";
   movement: { integrator: "swim2D" | "crawl2D" | "sharkPatrol2D"; homeRadius: number; vmax: number; turnRate: number; buoyancy?: number };
-  genetics: { traits: string[]; minAdultAgeSec: number; minAdultSizeFrac: number; mutationRate: number };
+  genetics: { 
+    traits: string[]; 
+    minAdultAgeSec: number; 
+    minAdultSizeFrac: number; 
+    mutationRate: number;
+    traitRanges?: {
+      [trait: string]: { min: number; max: number; default: number };
+    };
+  };
   spawning: { litterMin: number; litterMax: number };
   art: { draw: (ctx: CanvasRenderingContext2D, c: CreatureBase) => void; drawCorpse?: (ctx: CanvasRenderingContext2D, c: CreatureBase) => void };
   hooks?: Partial<{ onSpawn: (c: CreatureBase) => void; onDeath: (c: CreatureBase) => void; onEat: (c: CreatureBase, food: any) => void; chooseMate: (self: CreatureBase, candidates: CreatureBase[]) => CreatureBase | null; breedingRule: (a: CreatureBase, b: CreatureBase) => boolean; movementTick: (c: CreatureBase, dt: number) => void }>;

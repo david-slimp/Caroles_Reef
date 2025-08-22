@@ -1,4 +1,4 @@
-# 🌊 Carole's Reef -2D
+# 🌊 Carole's Reef
 
 Welcome to Carole's Reef, a relaxing virtual aquarium where you can breed and care for beautiful tropical fish. Watch as your fish swim, interact, and create new generations with unique patterns and colors!
 
@@ -46,4 +46,4 @@ Track your collection in the in-game encyclopedia:
 
 Carole's Reef is a relaxing aquarium simulation created with HTML5 and JavaScript. No installation required - just open in any modern web browser and enjoy!
 
-Version 0.0.2
+Version 0.1.0

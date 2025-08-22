@@ -1,21 +1,34 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.0] - 2025-08-22
 
 ### Added
-
+- **Creature Validation System**
+  - Added trait range validation for all creature attributes
+  - Automatic correction of out-of-range values when loading from storage
+  - Per-species trait range definitions (e.g., size, speedGene, senseGene)
+  - Persistent storage of corrected values to prevent repeated corrections
+  - Support for default values when traits are missing
 - Enhanced fish collection table with sortable columns
   - Added sorting functionality for Name, ID, Age, Size, Speed, Sense, Hue, Fins, and Pattern columns
   - Visual indicators (↑↓) show current sort column and direction
   - Clicking the same column toggles between ascending and descending order
 
 ### Fixed
-
+- **Data Integrity**
+  - Fixed potential data corruption by validating all creature attributes on load
+  - Ensured all numeric traits stay within defined ranges
+  - Added automatic correction of invalid position and size values
+  - Improved error handling for malformed creature data
 - Fixed speed column sorting in fish collection
   - Improved handling of numeric values for consistent sorting
   - Added debug logging for troubleshooting sorting issues
   - Ensured proper type conversion for all sortable fields
   - Added fallback mechanisms for missing or invalid data
+
+### Changed
+-  Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
+- "Caroles_Reef" had been planned as 3D, and this 2D version was to do a quick-start to show the basic potential of the game.  Since then I've decided this 2D version will be the main focus, and PERHAPS a 3D version may come later... but at this point I want the "Caroles_Reef" name and ID to point to the 2D version locally and on GitHub, and we will have a Caroles_Reef-3D if that ever comes about. So I've changed the GitHub repo for this project to https://github.com/david-slimp/Caroles_Reef.git
 
 
 ## [0.0.8] - 2025-08-15

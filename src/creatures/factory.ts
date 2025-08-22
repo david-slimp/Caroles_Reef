@@ -4,38 +4,23 @@
 import { getSpecies } from "./registry";
 import { mixGeneticsFor } from "./genetics/base";
 import type { CreatureBase } from "./types";
-
-export function spawnCreature(speciesId: string, opts:any={}): CreatureBase {
-  const spec = getSpecies(speciesId);
-  return mixGeneticsFor(spec, opts);
-}
-
-
-
-
-
-
-/*
- * other old example of what this file might look like below here...
- *
- *
-
-// src/creatures/factory.ts
+import { validateAndUpdateCreature } from "./validation";
 import { getEnv } from "../core/env";
-import { getSpecies } from "./registry";
-import { mixGeneticsFor } from "./genetics/base";
 
-export function spawnCreature(speciesId: string, opts = {}) {
+/**
+ * Creates a new creature with the specified species and options.
+ * Validates the creature's traits and position before returning.
+ */
+export function spawnCreature(speciesId: string, opts: any = {}): CreatureBase {
   const spec = getSpecies(speciesId);
-  const c = mixGeneticsFor(spec, opts); // handles defaults + parents + mutations
-  const { W, H } = getEnv().getSize();
-  c.x ??= Math.random() * (W-80) + 40;
-  c.y ??= Math.random() * (H-80) + 40;
-  return c;
+  const creature = mixGeneticsFor(spec, opts);
+  
+  // Get world dimensions for position validation
+  const env = getEnv();
+  const size = env.getSize ? env.getSize() : { W: 1000, H: 800 };
+  const { W: width = 1000, H: height = 800 } = size;
+  
+  // Validate, update localStorage if needed, and return the creature
+  return validateAndUpdateCreature(creature, width, height);
 }
 
-
- *
- *
- *
- */

@@ -350,7 +350,7 @@ async function updateFishProperties(
           const { fishCollection } = await import('../ui/FishCollection');
           if (fishCollection.isVisible()) {
             // Small delay to ensure the collection has time to register the storage update
-            setTimeout(() => fishCollection.refreshCollection(), 100);
+            // FIXME: setTimeout(() => fishCollection.refreshCollection(), 100);
           }
         } catch (error) {
           console.error('Error refreshing collection view:', error);
@@ -409,7 +409,7 @@ async function updateFishInCollection(updatedFish) {
           
           // Force refresh the collection view if it's open
           if (fishCollection.isVisible()) {
-            fishCollection.refreshCollection();
+            // FIXME: fishCollection.refreshCollection();
           }
         } catch (error) {
           console.error('Error saving to localStorage:', error);

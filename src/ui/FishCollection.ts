@@ -554,8 +554,6 @@ class FishCollection {
           if (this.onSelectFish) {
             this.onSelectFish(fish);
           }
-          // Don't hide the collection window after selection
-          // this.hide();
         });
       }
     });
