@@ -1,0 +1,57 @@
+name: Issue and PR Assignment
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened, ready_for_review]
+
+jobs:
+  assign-and-label:
+    name: Assign and label issues/PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process issue or PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            const isPR = context.eventName === 'pull_request_target';
+            
+            // Get the issue/PR details
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: number,
+            });
+            
+            // Default labels
+            let labels = ['needs-triage'];
+            
+            // Add type-specific labels
+            if (isPR) {
+              labels.push('enhancement'); // Default PR label
+            } else if (issue.labels.some(label => label.name === 'bug')) {
+              labels = labels.filter(l => l !== 'needs-triage');
+              labels.push('bug', 'needs-investigation');
+            } else if (issue.labels.some(label => label.name === 'documentation')) {
+              labels.push('documentation');
+            } else if (issue.labels.some(label => label.name === 'refactor')) {
+              labels.push('refactor');
+            }
+            
+            // Assign to david-slimp
+            await github.rest.issues.addAssignees({
+              owner,
+              repo,
+              issue_number: number,
+              assignees: ['david-slimp']
+            });
+            
+            // Add labels
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: number,
+              labels: labels
+            });
