@@ -25,6 +25,7 @@
   - Added debug logging for troubleshooting sorting issues
   - Ensured proper type conversion for all sortable fields
   - Added fallback mechanisms for missing or invalid data
+- Had to make some changes to deploy.sh as we moved sensitive data to .env and then deploy.sh started to complain about noEmitOnError.. should be working now.
 
 ### Changed
 -  Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
