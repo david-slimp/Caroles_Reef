@@ -1,7 +1,8 @@
 // /src/ui/FishCollection.ts
 
-import { getSavedFish, removeSavedFish, SavedFish } from '../utils/fishStorage';
+import { SavedFish } from '../utils/fishStorage';
 import { TailShape, getTailShapeDisplayName } from './FishCard';
+import { toast } from './toast';
 
 const FISH_COLLECTION_ID = 'fishCollectionPanel';
 
@@ -529,9 +530,7 @@ class FishCollection {
         e.stopPropagation();
         const fishId = deleteBtn.getAttribute('data-id');
         if (fishId) {
-          if (confirm('Are you sure you want to remove this fish from your collection?')) {
-            this.removeFish(fishId);
-          }
+          this.removeFish(fishId);
         }
         return;
       }
@@ -623,63 +622,51 @@ class FishCollection {
   }
   
   private removeFish(fishId: string): boolean {
+    console.log('removeFish called with ID:', fishId);
     try {
       const savedFish = this.getSavedFish();
+      console.log('Current fish count:', savedFish.length);
+      
       const initialLength = savedFish.length;
-      const updatedFish = savedFish.filter(fish => fish.id !== fishId);
+      const updatedFish = savedFish.filter(fish => {
+        console.log('Checking fish:', { id: fish.id, matches: fish.id === fishId });
+        return fish.id !== fishId;
+      });
+      
+      console.log('Updated fish count:', updatedFish.length);
       
       if (updatedFish.length < initialLength) {
+        console.log('Fish found, removing...');
         localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(updatedFish));
         
-        // Force a complete re-render of the collection
+        // Update the UI immediately without confirmation
+        console.log('Rendering updated collection...');
         this.render();
         
-        // Show success notification
-        this.showNotification('Fish removed from collection');
+        console.log('Showing notification...');
+        toast('Fish removed from collection');
+        console.log('Notification should be visible');
         
         // If no fish left, close the collection panel
         if (updatedFish.length === 0) {
+          console.log('No fish left, hiding panel...');
           this.hide();
         }
         
         return true;
       }
+
+      console.log('Fish not found in collection');
       return false;
     } catch (error) {
       console.error('Error removing fish:', error);
-      this.showNotification('Failed to remove fish', true);
+      toast('Failed to remove fish', true);
       return false;
     }
   }
   
-  private confirmDeleteFish(fishId: string): void {
-    if (confirm('Are you sure you want to remove this fish from your collection?')) {
-      this.removeFish(fishId);
-    }
-  }
-  
-  private confirmClearCollection(): void {
-    if (confirm('Are you sure you want to clear your entire fish collection? This cannot be undone.')) {
-      localStorage.removeItem('caroles_reef_saved_fish');
-      this.refreshCollection();
-      this.showNotification('Collection cleared');
-    }
-  }
-  
-  private showNotification(message: string, isError: boolean = false): void {
-    // You can replace this with your existing notification system
-    const toast = document.createElement('div');
-    toast.className = `toast ${isError ? 'error' : ''}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.classList.add('show');
-      setTimeout(() => {
-        toast.remove();
-      }, 3000);
-    }, 100);
-  }
+
+  // Using toast directly instead of showNotification
   
   /**
    * Start renaming a fish
@@ -703,8 +690,15 @@ class FishCollection {
     // Select all text in the input
     input.select();
     
+    // Track if we're already handling a submit to prevent duplicates
+    let isSubmitting = false;
+    
     // Handle input submission
     const handleSubmit = () => {
+      // Prevent multiple submissions
+      if (isSubmitting) return;
+      isSubmitting = true;
+      
       const newName = input.value.trim();
       if (newName && newName !== currentName) {
         this.renameFish(fishId, newName);
@@ -717,13 +711,22 @@ class FishCollection {
         span.title = 'Click to rename';
         input.replaceWith(span);
       }
+      
+      // Reset the flag after a short delay
+      setTimeout(() => { isSubmitting = false; }, 100);
     };
     
-    // Handle Enter key or blur
+    // Handle Enter key
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        // Remove the blur handler temporarily to prevent duplicate submission
+        input.removeEventListener('blur', handleSubmit);
         handleSubmit();
+        // Re-add the blur handler after a short delay
+        setTimeout(() => {
+          input.addEventListener('blur', handleSubmit);
+        }, 0);
       } else if (e.key === 'Escape') {
         const span = document.createElement('span');
         span.className = 'name editable';
@@ -734,6 +737,7 @@ class FishCollection {
       }
     });
     
+    // Add blur handler
     input.addEventListener('blur', handleSubmit);
   }
   
@@ -795,12 +799,12 @@ class FishCollection {
       this.refreshCollection();
       
       // Show success message
-      this.showNotification('Fish renamed successfully');
+      toast('Fish renamed successfully');
       
       return true;
     } catch (error) {
       console.error('Error renaming fish:', error);
-      this.showNotification('Failed to rename fish', true);
+      toast('Failed to rename fish', true);
       return false;
     }
   }
@@ -862,7 +866,7 @@ class FishCollection {
       return savedFishItem;
     } catch (error) {
       console.error('Error saving fish to collection:', error);
-      this.showNotification('Failed to save fish to collection', true);
+      toast('Failed to save fish to collection', true);
       return null;
     }
   }
@@ -877,7 +881,7 @@ class FishCollection {
       const fish = window.fish;
       if (!fish || !Array.isArray(fish)) {
         console.error('Could not find fish array');
-        this.showNotification('Failed to add fish to tank', true);
+        toast('Failed to add fish to tank', true);
         return false;
       }
       
@@ -887,7 +891,7 @@ class FishCollection {
       
     } catch (error) {
       console.error('Error spawning fish:', error);
-      this.showNotification('Failed to add fish to tank', true);
+      toast('Failed to add fish to tank', true);
       return false;
     }
   }
