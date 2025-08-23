@@ -31,12 +31,21 @@ jobs:
             // Add type-specific labels
             if (isPR) {
               labels.push('enhancement'); // Default PR label
-            } else if (issue.labels.some(label => label.name === 'bug')) {
+            } else if (
+              (issue.title && issue.title.toLowerCase().includes('bug')) ||
+              (issue.body && issue.body.toLowerCase().includes('bug'))
+            ) {
               labels = labels.filter(l => l !== 'needs-triage');
               labels.push('bug', 'needs-investigation');
-            } else if (issue.labels.some(label => label.name === 'documentation')) {
+            } else if (
+              (issue.title && issue.title.toLowerCase().includes('documentation')) ||
+              (issue.body && issue.body.toLowerCase().includes('documentation'))
+            ) {
               labels.push('documentation');
-            } else if (issue.labels.some(label => label.name === 'refactor')) {
+            } else if (
+              (issue.title && issue.title.toLowerCase().includes('refactor')) ||
+              (issue.body && issue.body.toLowerCase().includes('refactor'))
+            ) {
               labels.push('refactor');
             }
             
