@@ -93,14 +93,16 @@ export function runLegacyGame(canvasId: string = 'c') {
   // Add collection button handler
   document.getElementById('btnCollection')?.addEventListener('click', async () => {
     try {
-      // Dynamically import the fish collection
+      // Dynamically import the fish collection and validation
       const { fishCollection } = await import('../ui/FishCollection');
+      const { validateFishFinShape } = await import('../creatures/validation');
       
       // Pass a callback to handle when a fish is selected from the collection
       fishCollection.show((savedFish) => {
         // This will be called when a fish is selected from the collection
         if (savedFish && typeof savedFish === 'object') {
-          const fishData = savedFish.fishData || savedFish;
+          // Validate and update the fish's fin shape if needed
+          const fishData = validateFishFinShape(savedFish.fishData || savedFish);
           
           // Create a new fish with all required properties
           const newFish = {

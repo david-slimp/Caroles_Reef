@@ -1,6 +1,7 @@
 // /src/ui/FishCollection.ts
 
 import { getSavedFish, removeSavedFish, SavedFish } from '../utils/fishStorage';
+import { TailShape, getTailShapeDisplayName } from './FishCard';
 
 const FISH_COLLECTION_ID = 'fishCollectionPanel';
 
@@ -593,7 +594,7 @@ class FishCollection {
         <td class="fish-sense">${formatStat(fishData.senseRadius)}</td>
         <td class="fish-hue">${fishData.colorHue || 0}°</td>
         <td class="fish-color">${colorSwatch}</td>
-        <td class="fish-fins">${fishData.finShape || '—'}</td>
+        <td class="fish-fins">${fishData.finShape ? getTailShapeDisplayName(fishData.finShape as TailShape) : '—'}</td>
         <td class="fish-pattern">${fishData.patternType || '—'}</td>
         <td class="fish-actions">
           <button class="btn-delete" data-id="${fish.id}" title="Delete from collection">×</button>
