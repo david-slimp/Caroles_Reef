@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Notification System**
+  - Fixed issue requiring multiple confirmation clicks when deleting fish from the collection view
+  - Resolved duplicate notification messages when renaming fish by pressing Enter
+  - Replaced `showNotification` method with direct `toast` function calls for more reliable notifications
+  - Improved notification consistency and error handling throughout the FishCollection class - other places in the codebase will still need to be updated to use toast
+
 ## [0.1.2] - 2025-08-22
 
 ### Fixed
