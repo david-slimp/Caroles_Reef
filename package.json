@@ -1,6 +1,6 @@
 {
   "name": "caroles_reef",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A relaxing virtual aquarium where you can breed and care for beautiful tropical fish",
   "type": "module",
   "main": "src/main.ts",
@@ -41,6 +41,9 @@
     "howler": "^2.2.4"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.4",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",
     "@testing-library/user-event": "^14.5.2",
@@ -64,6 +67,7 @@
     "jsdom": "^26.1.0",
     "lint-staged": "^15.2.0",
     "prettier": "^3.2.4",
+    "semantic-release": "^24.2.7",
     "stylelint": "^16.2.0",
     "stylelint-config-standard": "^35.0.0",
     "typescript": "^5.3.3",

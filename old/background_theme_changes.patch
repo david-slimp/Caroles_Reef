@@ -1,0 +1,581 @@
+diff --git a/index.html b/index.html
+index 9fe8d71..745a0d0 100644
+--- a/index.html
++++ b/index.html
+@@ -79,21 +79,22 @@
+ 
+       <div id="panelTheme" class="panel">
+         <h3>Theme</h3>
++        <div class="row" id="themeButtons">
++          <!-- Gradient themes will be added here dynamically -->
++        </div>
+         <div class="row">
+-          <button data-theme="day">Daylight</button>
+-          <button data-theme="dusk">Dusk</button>
+-          <button data-theme="night">Night</button>
+-          <button data-theme="sunset">Sunset</button>
+-          <button data-theme="super-night">Super Night</button>
+-          <button data-theme="mermaid-glow">Mermaid Glow</button>
++          <h4>Background Image</h4>
++          <div class="image-options" id="imageBackgrounds">
++            <!-- Image backgrounds will be added here dynamically -->
++          </div>
+         </div>
+         <div class="row">
+-          <label>Bubble Level</label
+-          ><input id="bubbleLevel" type="range" min="0" max="1" step="0.01" value="0.6" />
++          <label>Bubble Level</label>
++          <input id="bubbleLevel" type="range" min="0" max="1" step="0.01" value="0.6" />
+         </div>
+         <div class="row">
+-          <label>Time Speed</label
+-          ><input id="timeSpeed" type="range" min="0.2" max="3" step="0.1" value="1" />
++          <label>Time Speed</label>
++          <input id="timeSpeed" type="range" min="0.2" max="3" step="0.1" value="1" />
+         </div>
+       </div>
+ 
+diff --git a/src/config/backgrounds.ts b/src/config/backgrounds.ts
+index 9e5e4af..1471ff0 100644
+--- a/src/config/backgrounds.ts
++++ b/src/config/backgrounds.ts
+@@ -1,13 +1,15 @@
+ // /src/config/backgrounds.ts
+ 
+-export type BackgroundStyle = 'gradient' | 'coral-reef' | 'custom-image' | 'future';
++export type BackgroundStyle = 'gradient' | 'coral-reef' | 'image' | 'future';
+ 
+ export interface BackgroundConfig {
+   type: BackgroundStyle;
+   // For gradient backgrounds
+   stops?: [number, string][];
+-  // For custom image
++  // For image backgrounds
+   imageUrl?: string;
++  // Display name for the theme
++  displayName?: string;
+   // For future extensions
+   [key: string]: any;
+ }
+@@ -15,6 +17,7 @@ export interface BackgroundConfig {
+ export const BACKGROUNDS: Record<string, BackgroundConfig> = {
+   gradient: {
+     type: 'gradient',
++    displayName: 'Gradient',
+     stops: [
+       [0, '#7ec8ff'],
+       [0.5, '#59a8e6'],
+@@ -23,14 +26,17 @@ export const BACKGROUNDS: Record<string, BackgroundConfig> = {
+   },
+   'coral-reef': {
+     type: 'coral-reef',
++    displayName: 'Coral Reef',
+     // Coral reef will be drawn programmatically
+   },
+-  'custom-image': {
+-    type: 'custom-image',
++  'tank-background': {
++    type: 'image',
++    displayName: 'Tank Background',
+     imageUrl: '/images/tank_background01.png',
+   },
+   future: {
+     type: 'future',
++    displayName: 'Future Theme',
+     // Placeholder for future background types
+   },
+ };
+diff --git a/src/legacy/runLegacyGame.ts b/src/legacy/runLegacyGame.ts
+index d47d19f..424add7 100644
+--- a/src/legacy/runLegacyGame.ts
++++ b/src/legacy/runLegacyGame.ts
+@@ -5,6 +5,7 @@ import {
+     breed, isAdult, isYoung, pickFish, handleBreeding, trackDiscovery
+ } from '../entities/fish';
+ import { playSound, Sounds, toggleMute, isMuted, playBackgroundMusic, pauseBackgroundMusic } from '../utils/audio';
++import { BACKGROUNDS, DEFAULT_BACKGROUND } from '../config/backgrounds';
+ 
+ import { configureDecor, decorSelect, decorRadius, placeDecor, nearDecorType } from '../entities/decor';
+ import { drawBackground } from '../render/background';
+@@ -91,9 +92,92 @@ export function runLegacyGame(canvasId: string = 'c') {
+   };
+   document.getElementById('decorType').onchange = e => (decorSelect.type = e.target.value);
+   document.getElementById('decorSize').onchange = e => (decorSelect.size = e.target.value);
+-  panelTheme.querySelectorAll('button[data-theme]').forEach(btn => {
+-    btn.onclick = () => setTheme(btn.dataset.theme);
+-  });
++
++  function initThemePanel() {
++    const themePanel = document.getElementById('panelTheme');
++    const themeButtonsContainer = document.getElementById('themeButtons');
++    const imageOptionsContainer = document.getElementById('imageBackgrounds');
++    
++    if (!themePanel || !themeButtonsContainer || !imageOptionsContainer) {
++      console.error('Could not find theme panel elements');
++      return;
++    }
++    
++    // Clear existing theme buttons
++    themeButtonsContainer.innerHTML = '';
++    imageOptionsContainer.innerHTML = '';
++    
++    // Add color theme buttons from THEMES configuration
++    Object.entries(THEMES).forEach(([id, config]) => {
++      const displayName = id.split('-').map(word => 
++        word.charAt(0).toUpperCase() + word.slice(1)
++      ).join(' ');
++      
++      const button = document.createElement('button');
++      button.dataset.theme = id;
++      button.textContent = displayName;
++      button.title = `Set theme to ${displayName}`;
++      button.addEventListener('click', () => {
++        setTheme(id);
++        // Update active state
++        themePanel.querySelectorAll('button[data-theme]').forEach(b => b.classList.remove('active'));
++        button.classList.add('active');
++      });
++      themeButtonsContainer.appendChild(button);
++    });
++    
++    // Add background options from BACKGROUNDS configuration
++    Object.entries(BACKGROUNDS).forEach(([id, config]) => {
++      if (config.type === 'image' && config.imageUrl) {
++        // For image backgrounds
++        const button = document.createElement('button');
++        button.className = 'image-option';
++        button.dataset.theme = id;
++        button.title = `Set background to ${config.displayName || id}`;
++        button.innerHTML = `
++          <img src="${config.imageUrl}" alt="${config.displayName || id}" class="thumbnail">
++          <span>${config.displayName || id}</span>
++        `;
++        button.addEventListener('click', (e) => {
++          e.stopPropagation();
++          setTheme(id);
++          // Update active state
++          themePanel.querySelectorAll('button[data-theme]').forEach(b => b.classList.remove('active'));
++          themePanel.querySelectorAll('.image-option').forEach(b => b.classList.remove('active'));
++          button.classList.add('active');
++        });
++        imageOptionsContainer.appendChild(button);
++      } else if (config.type === 'coral-reef') {
++        // For coral reef background
++        const button = document.createElement('button');
++        button.className = 'theme-option';
++        button.dataset.theme = id;
++        button.textContent = config.displayName || 'Coral Reef';
++        button.title = `Set theme to ${config.displayName || 'Coral Reef'}`;
++        button.addEventListener('click', () => {
++          setTheme(id);
++          // Update active state
++          themePanel.querySelectorAll('button[data-theme]').forEach(b => b.classList.remove('active'));
++          button.classList.add('active');
++        });
++        themeButtonsContainer.appendChild(button);
++      }
++    });
++    
++    // Set default active theme
++    const defaultThemeButton = themePanel.querySelector(`button[data-theme="${DEFAULT_BACKGROUND}"]`);
++    if (defaultThemeButton) {
++      defaultThemeButton.classList.add('active');
++    }
++  }
++  
++  // Initialize theme panel when the DOM is ready
++  if (document.readyState === 'loading') {
++    document.addEventListener('DOMContentLoaded', initThemePanel);
++  } else {
++    initThemePanel();
++  }
++
+   const bubbleLevel = document.getElementById('bubbleLevel');
+   bubbleLevel.oninput = () => (bubbles.targetDensity = parseFloat(bubbleLevel.value));
+   const timeSpeed = document.getElementById('timeSpeed');
+@@ -154,7 +238,10 @@ export function runLegacyGame(canvasId: string = 'c') {
+   let theme = 'day';
+   function setTheme(t) {
+     theme = t;
+-    toast(`Theme: ${t}`);
++    const displayName = t === 'tank-background' ? 'Tank Background' : t.split('-').map(word => 
++      word.charAt(0).toUpperCase() + word.slice(1)
++    ).join(' ');
++    toast(`Theme: ${displayName}`);
+   }
+ 
+   // Bubbles
+@@ -450,15 +537,30 @@ export function runLegacyGame(canvasId: string = 'c') {
+   // Main loop
+   let last = performance.now();
+   let dtGlobal = 0;
+-  function loop(now) {
++  let isDrawing = false;
++  
++  async function loop(now) {
+     const dt = ((now - last) / 1000) * timeScale;
+     last = now;
+     dtGlobal = dt;
++    
+     if (!paused) {
+       time += dt;
+       update(dt);
+     }
+-    draw();
++    
++    // Only start a new draw if the previous one is done
++    if (!isDrawing) {
++      isDrawing = true;
++      try {
++        await draw();
++      } catch (error) {
++        console.error('Error in draw loop:', error);
++      } finally {
++        isDrawing = false;
++      }
++    }
++    
+     requestAnimationFrame(loop);
+   }
+ 
+@@ -492,8 +594,15 @@ if (selectedFish && fishCard.style.display === 'block') {
+ 
+   }
+ 
+-  function draw() {
+-    drawBackground(ctx, W, H, theme);
++  async function draw() {
++    // Draw background first
++    try {
++      await drawBackground(ctx, W, H, theme);
++    } catch (error) {
++      console.error('Error drawing background:', error);
++    }
++    
++    // Draw decor and other elements
+     drawDecor();
+ 
+     // pellets
+diff --git a/src/render/background.ts b/src/render/background.ts
+index 3ccf169..c2519b1 100644
+--- a/src/render/background.ts
++++ b/src/render/background.ts
+@@ -1,19 +1,316 @@
+ // /src/render/background.ts
+ import { THEMES, type ThemeId } from '../config/themes';
++import { BACKGROUNDS, type BackgroundId } from '../config/backgrounds';
+ 
+-export function drawBackground(
++// Cache for loaded background images
++const backgroundCache: Record<string, HTMLImageElement> = {};
++
++/**
++ * Loads an image and caches it for future use
++ */
++async function loadImage(src: string): Promise<HTMLImageElement> {
++  if (backgroundCache[src]) {
++    return backgroundCache[src];
++  }
++
++  return new Promise((resolve, reject) => {
++    const img = new Image();
++    img.onload = () => {
++      backgroundCache[src] = img;
++      resolve(img);
++    };
++    img.onerror = (e) => {
++      console.error('Error loading background image:', src, e);
++      reject(e);
++    };
++    img.src = src;
++    img.crossOrigin = 'anonymous';
++  });
++}
++
++/**
++ * Draws a gradient background based on the provided theme
++ */
++function drawGradientBackground(
+   ctx: CanvasRenderingContext2D,
+   W: number,
+   H: number,
+   theme: ThemeId | string
+ ) {
+   const key = String(theme).trim() as keyof typeof THEMES;
+-  const spec = THEMES[key] ?? THEMES.day; // fallback so we never crash
++  const spec = THEMES[key] ?? THEMES.day;
+ 
+   const grd = ctx.createLinearGradient(0, 0, 0, H);
+   for (const [stop, color] of spec.stops) {
+     grd.addColorStop(stop as number, color as string);
+   }
++  
+   ctx.fillStyle = grd;
+   ctx.fillRect(0, 0, W, H);
+ }
++
++// Cache for coral reef canvas
++let coralReefCanvas: HTMLCanvasElement | null = null;
++let lastCoralReefDrawTime = 0;
++const CORAL_REEF_REDRAW_INTERVAL = 1000; // 1 second
++
++/**
++ * Draws a procedurally generated coral reef background
++ */
++function drawCoralReefBackground(
++  ctx: CanvasRenderingContext2D,
++  W: number,
++  H: number
++) {
++  const now = Date.now();
++  
++  // Only redraw if we don't have a cached canvas or it's time for a redraw
++  if (!coralReefCanvas || now - lastCoralReefDrawTime > CORAL_REEF_REDRAW_INTERVAL) {
++    // Create or clear the cached canvas
++    if (!coralReefCanvas) {
++      coralReefCanvas = document.createElement('canvas');
++      coralReefCanvas.width = W;
++      coralReefCanvas.height = H;
++    } else {
++      // Only resize if dimensions changed
++      if (coralReefCanvas.width !== W || coralReefCanvas.height !== H) {
++        coralReefCanvas.width = W;
++        coralReefCanvas.height = H;
++      } else {
++        // Clear the canvas
++        const tempCtx = coralReefCanvas.getContext('2d');
++        if (tempCtx) {
++          tempCtx.clearRect(0, 0, W, H);
++        }
++      }
++    }
++    
++    const tempCtx = coralReefCanvas.getContext('2d');
++    if (!tempCtx) return;
++    
++    // Draw the coral reef to the cached canvas
++    drawCoralReefToCanvas(tempCtx, W, H);
++    lastCoralReefDrawTime = now;
++  }
++  
++  // Draw the cached canvas to the main context
++  if (coralReefCanvas) {
++    ctx.drawImage(coralReefCanvas, 0, 0, W, H);
++  }
++}
++
++/**
++ * Helper function that performs the actual drawing of the coral reef
++ */
++function drawCoralReefToCanvas(
++  ctx: CanvasRenderingContext2D,
++  W: number,
++  H: number
++) {
++  // Draw gradient water background
++  const waterGradient = ctx.createLinearGradient(0, 0, 0, H);
++  waterGradient.addColorStop(0, '#0a2a66');
++  waterGradient.addColorStop(0.5, '#1a4b8c');
++  waterGradient.addColorStop(1, '#0c5a78');
++  
++  ctx.fillStyle = waterGradient;
++  ctx.fillRect(0, 0, W, H);
++  
++  // Add some subtle water caustics that move slowly
++  ctx.save();
++  ctx.globalAlpha = 0.1;
++  ctx.fillStyle = '#ffffff';
++  const time = Date.now() / 3000; // Slow movement
++  for (let i = 0; i < 10; i++) {
++    const x = (Math.sin(time + i * 0.5) * 0.5 + 0.5) * W;
++    const y = (Math.sin(time * 0.7 + i * 0.3) * 0.5 + 0.5) * H;
++    const size = 100 + Math.sin(time * 0.5 + i) * 30;
++    
++    const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
++    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
++    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
++    
++    ctx.fillStyle = gradient;
++    ctx.beginPath();
++    ctx.arc(x, y, size, 0, Math.PI * 2);
++    ctx.fill();
++  }
++  ctx.restore();
++  
++  // Draw sand at the bottom
++  const sandHeight = H * 0.2;
++  const sandGradient = ctx.createLinearGradient(0, H - sandHeight, 0, H);
++  sandGradient.addColorStop(0, '#e6c299');
++  sandGradient.addColorStop(1, '#d2a679');
++  
++  ctx.fillStyle = sandGradient;
++  ctx.beginPath();
++  ctx.moveTo(0, H);
++  
++  // Wavy sand line
++  const waveCount = 15;
++  const waveHeight = sandHeight * 0.3;
++  for (let i = 0; i <= waveCount; i++) {
++    const x = (W / waveCount) * i;
++    const y = H - sandHeight + (Math.sin(i * 0.7) * waveHeight * 0.5) - (waveHeight * 0.5);
++    ctx.lineTo(x, y);
++  }
++  
++  ctx.lineTo(W, H);
++  ctx.closePath();
++  ctx.fill();
++  
++  // Draw some coral shapes
++  ctx.save();
++  
++  // Draw coral function
++  const drawCoral = (x: number, height: number, width: number, color: string) => {
++    ctx.fillStyle = color;
++    ctx.beginPath();
++    ctx.moveTo(x, H);
++    
++    // Create wavy coral shape
++    const segments = 8;
++    const segmentWidth = width / segments;
++    
++    for (let i = 0; i <= segments; i++) {
++      const xPos = x - (width / 2) + (i * segmentWidth);
++      const yPos = H - (height * (i / segments));
++      const offset = Math.sin(i * 0.8) * (width * 0.3);
++      
++      if (i === 0) {
++        ctx.moveTo(xPos, yPos);
++      } else {
++        ctx.quadraticCurveTo(xPos - segmentWidth / 2, H - (height * ((i - 0.5) / segments)) + offset, xPos, yPos);
++      }
++    }
++    
++    // Close the path to the base
++    ctx.lineTo(x + width/2, H);
++    ctx.closePath();
++    ctx.fill();
++  };
++  
++  // Draw multiple corals
++  const corals = [
++    { x: W * 0.2, height: H * 0.4, width: 40, color: '#ff6b6b' },
++    { x: W * 0.4, height: H * 0.3, width: 30, color: '#ff9e7d' },
++    { x: W * 0.6, height: H * 0.5, width: 35, color: '#ffb3b3' },
++    { x: W * 0.8, height: H * 0.35, width: 25, color: '#ff8e8e' },
++    { x: W * 0.9, height: H * 0.25, width: 20, color: '#ff6b6b' },
++  ];
++  
++  corals.forEach(coral => {
++    drawCoral(coral.x, coral.height, coral.width, coral.color);
++  });
++  
++  // Add some small rocks
++  ctx.fillStyle = '#8c7a6b';
++  const rockSeed = Math.floor(Date.now() / 1000); // Change every second
++  for (let i = 0; i < 10; i++) {
++    // Use a seeded random for consistent positioning between frames
++    const random = (seed: number) => {
++      const x = Math.sin(seed * (i + 1) * 1000) * 10000;
++      return x - Math.floor(x);
++    };
++    
++    const x = random(rockSeed + i) * W;
++    const size = 10 + random(rockSeed + i + 10) * 20;
++    ctx.beginPath();
++    ctx.arc(x, H - 5, size, 0, Math.PI, true);
++    ctx.fill();
++  }
++  
++  ctx.restore();
++}
++
++/**
++ * Draws an image background, scaling it to cover the canvas while maintaining aspect ratio
++ */
++async function drawImageBackground(
++  ctx: CanvasRenderingContext2D,
++  W: number,
++  H: number,
++  imageUrl: string
++) {
++  try {
++    const img = await loadImage(imageUrl);
++    const canvasAspect = W / H;
++    const imgAspect = img.width / img.height;
++    
++    let drawWidth, drawHeight, offsetX, offsetY;
++    
++    if (imgAspect > canvasAspect) {
++      // Image is wider than canvas
++      drawHeight = H;
++      drawWidth = H * imgAspect;
++      offsetX = (W - drawWidth) / 2;
++      offsetY = 0;
++    } else {
++      // Image is taller than canvas
++      drawWidth = W;
++      drawHeight = W / imgAspect;
++      offsetX = 0;
++      offsetY = (H - drawHeight) / 2;
++    }
++    
++    // Clear the canvas
++    ctx.clearRect(0, 0, W, H);
++    // Draw the image
++    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
++    return true;
++  } catch (error) {
++    console.error('Failed to load background image, falling back to gradient', error);
++    return false;
++  }
++}
++
++/**
++ * Main function to draw the background based on the current theme
++ */
++export async function drawBackground(
++  ctx: CanvasRenderingContext2D,
++  W: number,
++  H: number,
++  theme: ThemeId | string
++): Promise<void> {
++  const themeKey = String(theme).trim();
++  
++  // Check if the theme is a background ID
++  const backgroundConfig = BACKGROUNDS[themeKey as BackgroundId];
++  
++  if (backgroundConfig) {
++    // Handle different background types
++    switch (backgroundConfig.type) {
++      case 'image':
++        if (backgroundConfig.imageUrl) {
++          const success = await drawImageBackground(ctx, W, H, backgroundConfig.imageUrl);
++          if (success) return;
++        }
++        break;
++        
++      case 'gradient':
++        if (backgroundConfig.stops) {
++          // If the background has its own gradient definition, use it
++          const grd = ctx.createLinearGradient(0, 0, 0, H);
++          for (const [stop, color] of backgroundConfig.stops) {
++            grd.addColorStop(stop, color);
++          }
++          ctx.fillStyle = grd;
++          ctx.fillRect(0, 0, W, H);
++          return;
++        }
++        break;
++        
++      case 'coral-reef':
++        // Draw procedurally generated coral reef
++        drawCoralReefBackground(ctx, W, H);
++        return;
++        
++      // Add more background types as needed
++    }
++  }
++  
++  // Fall back to theme-based gradient if no specific background is found or fails to load
++  drawGradientBackground(ctx, W, H, theme);
++}

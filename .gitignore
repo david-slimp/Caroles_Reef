@@ -1,3 +1,11 @@
+
+# ======================
+# Personal Help files
+# ======================
+scripts/deploy.sh
+Code_Steps.md
+
+
 # ======================
 # OS-Specific (Linux)
 # ======================
@@ -125,6 +133,3 @@ windsurf-workspace.json
 .vscode-test/
 .pnp.js
 
-
-# Deployment scripts
-deploy.sh

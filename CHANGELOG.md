@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.1] - 2025-08-22
+
+### Changed
+- **Project Structure**
+  - Moved `style.css` to `src/styles/` for better organization
+  - Relocated deployment scripts to `scripts/` directory
+  - Updated file references to maintain functionality
+  - Cleaned up root directory by removing unnecessary files and moving some to proper subdirs
+  - Updated `.gitignore` to properly handle moved files
+  - added the new background music (track 02) - from suno.ai
+
 ## [0.1.0] - 2025-08-22
 
 ### Added
