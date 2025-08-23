@@ -18,8 +18,19 @@ export interface CreatureBase {
   sex?: Sex;
   size: number; maxSize: number; birthSize: number;
   speedGene?: number; senseGene?: number; hungerGene?: number; rarityGene?: number;
-// FIXME: only certain classes of animals will have "finShape" so we will need to decide on which sets of animals do and which do not and fit that in to our CFSV (Class/Family/Species/Variety) breakdown
-  colorHue?: number; patternType?: string; finShape?: string; eyeType?: string;
+  // Visual attributes
+  colorHue?: number;
+  patternType?: string;
+  /**
+   * The shape of the fish's tail/fin
+   * - pointy: Sharp, narrow tail that tapers to a point
+   * - round: Smooth, rounded tail
+   * - fan: Wide, fan-shaped tail
+   * - forked: Tail with a distinct notch in the middle (like a tuna)
+   * - lunate: Crescent moon-shaped tail (like a mackerel)
+   */
+  finShape?: 'pointy' | 'round' | 'fan' | 'forked' | 'lunate';
+  eyeType?: string;
 
   // breeding state
   _breedCd?: number;

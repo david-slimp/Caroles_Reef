@@ -61,7 +61,7 @@ function killFish(f:any){
 
 /* ---------------- legacy-ish data ---------------- */
 const patterns = ['solid','stripes','spots','gradient'];
-const fins     = ['long','round','fan','pointy'];
+const fins = ['pointy', 'round', 'fan', 'forked', 'lunate'];
 const eyes     = ['round','sleepy','sparkly','winking'];
 
 /* ---------------- genetics helpers ---------------- */
@@ -1021,13 +1021,196 @@ export function drawFish(f:any){
   const darker  = `hsl(${(f.colorHue+330)%360} 70% 35%)`;
   const lighter = `hsl(${f.colorHue} 80% 70%)`;
 
-  // tail
-  ctx.fillStyle = lighter; ctx.beginPath();
-  const tailW = f.finShape==='long'? bodyHt*0.9: f.finShape==='fan'? bodyHt*1.1: f.finShape==='pointy'? bodyHt*0.6: bodyHt*0.8;
-  const tailL = f.finShape==='long'? bodyLen*0.45: f.finShape==='fan'? bodyLen*0.35: f.finShape==='pointy'? bodyLen*0.4: f.finShape*0.3;
-  ctx.moveTo(-bodyLen*0.5,0);
-  ctx.quadraticCurveTo(-bodyLen*0.5-tailL*0.5, -tailW*0.2, -bodyLen*0.5-tailL, 0);
-  ctx.quadraticCurveTo(-bodyLen*0.5-tailL*0.5, tailW*0.2, -bodyLen*0.5, 0); ctx.fill();
+  // tail (improved)
+drawBetterTail(ctx, f.finShape, bodyLen, bodyHt, lighter, darker);
+
+function drawBetterTail(
+  ctx: CanvasRenderingContext2D,
+  finShape: string,
+  bodyLen: number,
+  bodyHt: number,
+  lighter: string,
+  darker: string
+) {
+  // Start the tail slightly inside the body for a more natural look (0.45 instead of 0.5)
+  const sx = -bodyLen * 0.45; // tail root (starts inside the body on -X side)
+
+  ctx.fillStyle = lighter;
+  ctx.strokeStyle = darker;
+  ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  switch (finShape) {
+    case "pointy": {
+      // Sleek, tapered diamond/leaf to a point
+      const L = bodyLen * 0.42;
+      const baseW = bodyHt * 0.4;  // 50% narrower at base (was 0.55, now 0.4 of body height)
+      const tipW = Math.max(1.5, bodyHt * 0.06);
+      const ex = sx - L;
+
+      ctx.beginPath();
+      ctx.moveTo(sx, -baseW * 0.5);
+      ctx.bezierCurveTo(
+        sx - L * 0.35, -baseW * 0.85,
+        ex - L * 0.05, -tipW,
+        ex, 0
+      );
+      ctx.bezierCurveTo(
+        ex - L * 0.05, tipW,
+        sx - L * 0.35, baseW * 0.85,
+        sx, baseW * 0.5
+      );
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      break;
+    }
+
+    case "round": {
+      // Big, rounded and elongated tail
+      const L = bodyLen * 0.75;  // Increased length for a more elongated look
+      const baseW = bodyHt * 0.75;
+      const endW  = bodyHt * 1.15;  // Slightly wider at the end
+      const ex = sx - L;
+
+      ctx.beginPath();
+      ctx.moveTo(sx, -baseW * 0.5);
+      // More pronounced curve for a rounder shape
+      ctx.bezierCurveTo(
+        sx - L * 0.6, -endW * 0.95,  // More pronounced curve
+        sx - L * 0.9, -endW * 0.7,   // Control point moved further out
+        ex, 0
+      );
+      // Matching curve on the bottom
+      ctx.bezierCurveTo(
+        sx - L * 0.9, endW * 0.7,    // Control point moved further out
+        sx - L * 0.6, endW * 0.95,   // More pronounced curve
+        sx, baseW * 0.5
+      );
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      break;
+    }
+
+    case "fan": {
+      // Wide, almost flat trailing edge with rounded corners
+      const L = bodyLen * 0.48;
+      const baseW = bodyHt * 0.5;
+      const endW  = bodyHt * 1.75;
+      const ex = sx - L;
+      const r = Math.min(12, L * 0.16); // corner radius
+
+      ctx.beginPath();
+      ctx.moveTo(sx, -baseW * 0.5);
+      ctx.lineTo(ex + r, -endW * 0.5);
+      ctx.quadraticCurveTo(ex, -endW * 0.5, ex, -endW * 0.5 + r);
+      ctx.lineTo(ex,  endW * 0.5 - r);
+      ctx.quadraticCurveTo(ex, endW * 0.5, ex + r, endW * 0.5);
+      ctx.lineTo(sx, baseW * 0.5);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      break;
+    }
+
+    case "forked": {
+      // Straighter, K-like angles with a notch; slightly asymmetric (shark-ish)
+      const L = bodyLen * 0.70;
+      const baseW = bodyHt * 0.5;
+      const lobeH = bodyHt * 1.15;
+      const ex = sx - L;
+      const notch = L * 0.45;      // 65% of tail length
+      const nx = ex + notch;
+      const top = -lobeH * 0.80;   // top lobe a bit longer
+      const bot =  lobeH * 0.25;   // bottom lobe shorter
+
+      ctx.beginPath();
+      ctx.moveTo(sx, -baseW * 0.5);
+      ctx.lineTo(ex, top);
+      ctx.lineTo(nx, 0);
+      ctx.lineTo(ex, bot);
+      ctx.lineTo(sx,  baseW * 0.5);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      break;
+    }
+
+    case "lunate": {
+      // Attach point where tail meets body
+      const tailStartX = -bodyLen * 0.45;       // Match the inset used in other tails
+      const sx = tailStartX;
+      const peduncle = bodyHt * 0.36;           // base width (increased from 0.36 to 0.48 for thicker base)
+      const L = bodyLen * 0.72;                 // tail length
+    
+      // Crescent geometry: outer/inner arc centers and radii
+      const cxO = sx - L * 0.68;                // outer arc center (further left)
+      const cxI = cxO + L * 0.18;               //  28 inner arc center (pulled toward body for deeper “bite”)
+      const ROut = L * 0.80;                    // outer radius
+      const RIn  = L * 0.30;                    // inner radius  0.54
+      const phi  = Math.PI * 0.58;              // ~104° span; wider = more “C”
+    
+      // Wisp length (tip flourish)
+      const wisp = Math.min(L * 0.52, 22);      // the second  
+    
+      // Base anchors
+      const topBaseX = sx, topBaseY = -peduncle * 1.5;      // this  was 0.5
+      const botBaseX = sx, botBaseY =  peduncle * 0.1;
+    
+      // Arc endpoints at ±phi (top = -phi, bottom = +phi)
+      const pOutTopX = cxO + ROut * Math.cos(-phi);
+      const pOutTopY =            ROut * Math.sin(-phi);
+      const pOutBotX = cxO + ROut * Math.cos( phi);
+      const pOutBotY =            ROut * Math.sin( phi);
+    
+      const pInBotX  = cxI + RIn  * Math.cos( phi);
+      const pInBotY  =            RIn  * Math.sin( phi);
+      const pInTopX  = cxI + RIn  * Math.cos(-phi);
+      const pInTopY  =            RIn  * Math.sin(-phi);
+    
+      ctx.beginPath();
+    
+      // Ease from base top into the outer arc (no sharp corner)
+      ctx.moveTo(topBaseX, topBaseY);
+      ctx.quadraticCurveTo(
+        sx - L * 0.18, -peduncle * 1.1,   // soft lead-in
+        pOutTopX,      pOutTopY
+      );
+    
+      // OUTER arc: top → bottom (clockwise)
+      ctx.arc(cxO, 0, ROut, -phi, +phi, false);
+    
+      // Bottom wisp: overshoot then hook back to the inner rim
+      ctx.quadraticCurveTo(
+        pOutBotX - wisp, pOutBotY + wisp * 0.35,
+        pInBotX,         pInBotY
+      );
+    
+      // INNER arc: bottom → top (counter-clockwise)
+      ctx.arc(cxI, 0, RIn, +phi, -phi, true);
+    
+      // Top wisp: small hook outward, then back to base top
+      ctx.quadraticCurveTo(
+        pInTopX - wisp, pInTopY - wisp * 0.35,
+        topBaseX,       topBaseY
+      );
+    
+      // Close along the body side to give the root some thickness
+      ctx.lineTo(botBaseX, botBaseY);
+    
+      // Draw the outline
+      ctx.strokeStyle = darker;
+      ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
+      ctx.stroke();
+      
+      // Fill the shape
+      ctx.fill();
+      ctx.closePath();
+      break;
+    }
+  }
+}
+
+  
+  // Main fish body continues here
 
   // body gradient
   const grd = ctx.createLinearGradient(-bodyLen*0.5,0,bodyLen*0.5,0);

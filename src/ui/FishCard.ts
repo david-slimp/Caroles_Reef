@@ -5,6 +5,22 @@
 
 export type Sex = 'M' | 'F';
 
+export type TailShape = 'pointy' | 'round' | 'fan' | 'forked' | 'lunate';
+
+/**
+ * Gets a display-friendly name for a tail shape
+ */
+export function getTailShapeDisplayName(shape: TailShape): string {
+  const names = {
+    pointy: 'Pointy',
+    round: 'Round',
+    fan: 'Fan',
+    forked: 'Forked',
+    lunate: 'Lunate'
+  };
+  return names[shape] || shape;
+}
+
 export interface ParentsRef {
   ma?: string;
   pa?: string;
@@ -16,10 +32,14 @@ export interface FishData {
   species?: string;
   generation?: number;
 
-  // Visual
+    // Visual
   colorHue?: number;
   patternType?: string;
-  finShape?: string;
+  /** 
+   * The shape of the fish's tail/fin
+   * @see {TailShape}
+   */
+  finShape?: TailShape;
   eyeType?: string;
 
   // Physical / stats

@@ -26,6 +26,15 @@ export function validateCreatureTraits(creature: CreatureBase): ValidationResult
   const validated = { ...creature };
   let wasModified = false;
 
+  // Special validation for finShape
+  if ('finShape' in validated) {
+    const validFinShapes = ['pointy', 'round', 'fan', 'forked', 'lunate'] as const;
+    if (!validFinShapes.includes(validated.finShape as any)) {
+      validated.finShape = 'fan'; // Set default to 'fan' if invalid
+      wasModified = true;
+    }
+  }
+
   // Validate each trait that has a defined range
   for (const [trait, range] of Object.entries(traitRanges)) {
     // Only validate if the trait exists on the creature
@@ -144,9 +153,42 @@ export function validateAndUpdateCreature(
   return validated;
 }
 
+/**
+ * Validates and updates fish fin shape, ensuring it's one of the valid options.
+ * Saves the updated fish back to localStorage if changes were made.
+ * @param fishData The fish data to validate
+ * @returns The validated fish data
+ */
+export function validateFishFinShape(fishData: any): any {
+  const validFins = ['pointy', 'round', 'fan', 'forked', 'lunate'] as const;
+  const updatedFish = { ...fishData };
+  
+  // Check if fin shape is valid
+  if (!validFins.includes(updatedFish.finShape)) {
+    updatedFish.finShape = 'fan';
+    
+    // If this is a saved fish with an ID, update it in localStorage
+    if (updatedFish.id) {
+      try {
+        const savedFish = JSON.parse(localStorage.getItem('savedFish') || '[]');
+        const index = savedFish.findIndex((f: any) => f.id === updatedFish.id);
+        if (index !== -1) {
+          savedFish[index] = updatedFish;
+          localStorage.setItem('savedFish', JSON.stringify(savedFish));
+        }
+      } catch (error) {
+        console.error('Error updating fish in localStorage:', error);
+      }
+    }
+  }
+  
+  return updatedFish;
+}
+
 export default {
   validateCreature,
   validateAndUpdateCreature,
   validateCreatureTraits,
-  validateCreaturePosition
+  validateCreaturePosition,
+  validateFishFinShape
 };

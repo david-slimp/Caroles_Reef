@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2] - 2025-08-22
+
+### Fixed
+- Fish tails "finShape" was not drawn in a noticeable difference, so we updated the valid finShapes to be ['pointy', 'round', 'fan', 'forked', 'lunate'] (deprecating 'long') and tweaked the look of each
+- **Fish Validation**
+  - Fixed invalid fin shapes (like 'long') being set to 'fan' by default
+  - Added automatic validation when adding fish from collection
+  - Ensured corrected fin shapes are saved back to localStorage
+
 ## [0.1.1] - 2025-08-22
 
 ### Changed
@@ -9,7 +18,7 @@
   - Updated file references to maintain functionality
   - Cleaned up root directory by removing unnecessary files and moving some to proper subdirs
   - Updated `.gitignore` to properly handle moved files
-  - added the new background music (track 02) - from suno.ai
+  - Added the new background music (track 02) - from suno.ai
 
 ## [0.1.0] - 2025-08-22
 
