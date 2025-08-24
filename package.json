@@ -1,6 +1,6 @@
 {
   "name": "caroles_reef",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A relaxing virtual aquarium where you can breed and care for beautiful tropical fish",
   "type": "module",
   "main": "src/main.ts",
