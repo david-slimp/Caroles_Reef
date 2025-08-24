@@ -5,6 +5,15 @@
 - resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
 - trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
 - update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
+- update sed command to be cross-platform compatible ([379fa7e](https://github.com/david-slimp/caroles_reef/commit/379fa7e724e715eea8f48c1c13266aa11c313eeb))
+
+## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
+
+### Bug Fixes
+
+- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
+- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
+- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
 
 ## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
 
