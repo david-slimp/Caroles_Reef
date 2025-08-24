@@ -7,7 +7,7 @@
       "changelogFile": "CHANGELOG.md"
     }],
     ["@semantic-release/exec", {
-      "prepareCmd": "sed -i '' \"s/Carole's Reef — [0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*/Carole's Reef — ${nextRelease.version}/g\" index.html"
+      "prepare": "sed -i '' 's|Carole\\'s Reef — [0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*|Carole\\'s Reef — ${nextRelease.version}|g' index.html"
     }],
     ["@semantic-release/git", {
       "assets": ["CHANGELOG.md", "package.json", "index.html"],
