@@ -1,8 +1,16 @@
+## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
+
+### Bug Fixes
+
+- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
+- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
+
 # Changelog
 
 ## [Unreleased]
 
 ### Fixed
+
 - **Notification System**
   - Fixed issue requiring multiple confirmation clicks when deleting fish from the collection view
   - Resolved duplicate notification messages when renaming fish by pressing Enter
@@ -12,6 +20,7 @@
 ## [0.1.2] - 2025-08-22
 
 ### Fixed
+
 - Fish tails "finShape" was not drawn in a noticeable difference, so we updated the valid finShapes to be ['pointy', 'round', 'fan', 'forked', 'lunate'] (deprecating 'long') and tweaked the look of each
 - **Fish Validation**
   - Fixed invalid fin shapes (like 'long') being set to 'fan' by default
@@ -21,6 +30,7 @@
 ## [0.1.1] - 2025-08-22
 
 ### Changed
+
 - **Project Structure**
   - Moved `style.css` to `src/styles/` for better organization
   - Relocated deployment scripts to `scripts/` directory
@@ -32,6 +42,7 @@
 ## [0.1.0] - 2025-08-22
 
 ### Added
+
 - **Creature Validation System**
   - Added trait range validation for all creature attributes
   - Automatic correction of out-of-range values when loading from storage
@@ -44,6 +55,7 @@
   - Clicking the same column toggles between ascending and descending order
 
 ### Fixed
+
 - **Data Integrity**
   - Fixed potential data corruption by validating all creature attributes on load
   - Ensured all numeric traits stay within defined ranges
@@ -57,9 +69,9 @@
 - Had to make some changes to deploy.sh as we moved sensitive data to .env and then deploy.sh started to complain about noEmitOnError.. should be working now.
 
 ### Changed
--  Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
-- "Caroles_Reef" had been planned as 3D, and this 2D version was to do a quick-start to show the basic potential of the game.  Since then I've decided this 2D version will be the main focus, and PERHAPS a 3D version may come later... but at this point I want the "Caroles_Reef" name and ID to point to the 2D version locally and on GitHub, and we will have a Caroles_Reef-3D if that ever comes about. So I've changed the GitHub repo for this project to https://github.com/david-slimp/Caroles_Reef.git
 
+- Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
+- "Caroles_Reef" had been planned as 3D, and this 2D version was to do a quick-start to show the basic potential of the game. Since then I've decided this 2D version will be the main focus, and PERHAPS a 3D version may come later... but at this point I want the "Caroles_Reef" name and ID to point to the 2D version locally and on GitHub, and we will have a Caroles_Reef-3D if that ever comes about. So I've changed the GitHub repo for this project to https://github.com/david-slimp/Caroles_Reef.git
 
 ## [0.0.8] - 2025-08-15
 
@@ -170,8 +182,6 @@
 - Separated concerns (rendering, game logic, state management)
 - Added proper TypeScript types and interfaces
 - Improved code organization and maintainability
-
-
 
 ## [0.0.3] - 2025-08-11
 
