@@ -2,15 +2,16 @@
   "branches": ["main"],
   "tagFormat": "v${version}",
   "preset": "angular",
+  "verifyConditions": ["@semantic-release/github"],
   "plugins": [
     ["@semantic-release/commit-analyzer", {
       "preset": "angular",
       "releaseRules": [
-        {"type": "chore", "release": "patch"},
+        {"type": "chore", "release": false},
         {"type": "fix", "release": "patch"},
         {"type": "feat", "release": "minor"},
         {"type": "feat!", "release": "major"},
-        {"type": "*", "release": "patch"}
+        {"type": "*", "release": false}
       ]
     }],
     "@semantic-release/release-notes-generator",
@@ -18,11 +19,14 @@
       "changelogFile": "CHANGELOG.md"
     }],
     ["@semantic-release/exec", {
-      "prepare": "sed -i.bak 's|Carole.s Reef — [0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*|Carole\\'s Reef — ${nextRelease.version}|g' index.html && rm index.html.bak || true"
+      "verifyRelease": "echo \"Using version: ${nextRelease.version}\""
     }],
     ["@semantic-release/git", {
       "assets": ["CHANGELOG.md", "package.json", "index.html"],
       "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }],
+    ["@semantic-release/exec", {
+      "prepare": "sed -i.bak 's|Carole\\'s Reef — [0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*|Carole\\'s Reef — ${nextRelease.version}|g' index.html && rm -f index.html.bak"
     }],
     ["@semantic-release/github", {
       "successComment": ":tada: This ${issue.pull_request ? 'PR is included' : 'issue has been resolved'} in version ${nextRelease.version} :tada:\n\nThe release is available on [GitHub release](<github_release_url>)\n\nYour **[semantic-release]()** bot :package::rocket:"
