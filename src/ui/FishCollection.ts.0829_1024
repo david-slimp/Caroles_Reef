@@ -716,7 +716,9 @@ class FishCollection {
       return false;
     }
   }
+  
 
+  
   /**
    * Start renaming a fish
    */
@@ -1037,174 +1039,151 @@ class FishCollection {
     }
   }
 
-  /**
-   * Save a fish to the collection
-   */
-  private getGameState() {
-    // Try to get gameState from window
-    if ((window as any).gameState) {
-      return (window as any).gameState;
-    }
+/**
+* Save a fish to the collection
+*/
+private getGameState() {
+// Try to get gameState from window
+if ((window as any).gameState) {
+return (window as any).gameState;
+}
 
-    // If not found, try to import it
-    try {
-      const { gameState } = require('../state/GameState');
-      if (gameState) {
-        (window as any).gameState = gameState;
-        return gameState;
-      }
-    } catch (e) {
-      console.warn('Could not import gameState:', e);
-    }
+// If not found, try to import it
+try {
+const { gameState } = require('../state/GameState');
+if (gameState) {
+(window as any).gameState = gameState;
+return gameState;
+}
+} catch (e) {
+console.warn('Could not import gameState:', e);
+}
 
-    return null;
-  }
+return null;
+}
 
-  public saveFish(fishData: any, name: string = ''): SavedFish | null {
-    try {
-      console.log('Saving fish to collection...');
-      console.log('Fish data to save:', { 
-        id: fishData.id, 
-        name: name || fishData.name, 
-        species: fishData.species 
-      });
+public saveFish(fishData: any, name: string = ''): SavedFish | null {
+try {
+console.log('Saving fish to collection...');
+console.log('Fish data to save:', { 
+id: fishData.id, 
+name: name || fishData.name, 
+species: fishData.species 
+});
 
-      // Generate a new ID if one doesn't exist
-      const fishId = fishData.id || `fish_${Date.now()}`;
+// Generate a new ID if one doesn't exist
+const fishId = fishData.id || `fish_${Date.now()}`;
 
-      // Get the current game state
-      const gameState = this.getGameState();
-      let currentFishCollection: any[] = [];
-    } catch (e) {
-      console.warn('Could not import gameState:', e);
-    }
+// Get the current game state
+const gameState = this.getGameState();
+let currentFishCollection: any[] = [];
 
-    return null;
-  }
+// Try to load existing collection from gameState
+if (gameState) {
+const state = gameState.getState();
+console.log('Current game state:', JSON.parse(JSON.stringify(state)));
+currentFishCollection = Array.isArray(state?.fishCollection) 
+? [...state.fishCollection] 
+: [];
+console.log(`Loaded ${currentFishCollection.length} fish from gameState`);
+} else {
+// Fallback to localStorage if gameState is not available
+console.log('gameState not available, checking localStorage');
+const saved = localStorage.getItem('caroles_reef_saved_fish');
+currentFishCollection = saved ? JSON.parse(saved) : [];
+console.log(`Loaded ${currentFishCollection.length} fish from localStorage`);
+}
 
-  public saveFish(fishData: any, name: string = ''): SavedFish | null {
-    try {
-      console.log('Saving fish to collection...');
-      console.log('Fish data to save:', { 
-        id: fishData.id, 
-        name: name || fishData.name, 
-        species: fishData.species 
-      });
+// Create the fish data object
+const fishToSave = {
+...fishData,
+id: fishId,
+name: name || fishData.name || `Fish ${currentFishCollection.length + 1}`,
+saveDate: new Date().toISOString()
+};
 
-      // Generate a new ID if one doesn't exist
-      const fishId = fishData.id || `fish_${Date.now()}`;
+const savedFishItem: SavedFish = {
+id: fishId,
+name: fishToSave.name,
+saveDate: fishToSave.saveDate,
+fishData: fishToSave,
+species: fishToSave.species || 'unknown',
+rarity: fishToSave.rarityGene ? `Tier ${fishToSave.rarityGene}` : 'Common',
+generation: fishToSave.generation || 1,
+timestamp: Date.now()
+};
 
-      // Get the current game state
-      const gameState = this.getGameState();
-      let currentFishCollection: any[] = [];
+// Check if fish already exists
+const existingIndex = currentFishCollection.findIndex(fish => 
+fish.id === fishId || 
+fish.fishData?.originalId === fishData.originalId ||
+fish.fishData?.id === fishData.originalId
+);
 
-      // Try to load existing collection from gameState
-      if (gameState) {
-        const state = gameState.getState();
-        console.log('Current game state:', JSON.parse(JSON.stringify(state)));
-        currentFishCollection = Array.isArray(state?.fishCollection) 
-          ? [...state.fishCollection] 
-          : [];
-        console.log(`Loaded ${currentFishCollection.length} fish from gameState`);
-      } else {
-        // Fallback to localStorage if gameState is not available
-        console.log('gameState not available, checking localStorage');
-        const saved = localStorage.getItem('caroles_reef_saved_fish');
-        currentFishCollection = saved ? JSON.parse(saved) : [];
-        console.log(`Loaded ${currentFishCollection.length} fish from localStorage`);
-      }
+// Update or add the fish
+if (existingIndex >= 0) {
+console.log(`Updating existing fish at index ${existingIndex}`);
+currentFishCollection[existingIndex] = savedFishItem;
+} else {
+console.log('Adding new fish to collection');
+currentFishCollection.push(savedFishItem);
+}
 
-      // Create the fish data object
-      const fishToSave = {
-       ...fishData,
-       id: fishId,
-       name: name || fishData.name || `Fish ${currentFishCollection.length + 1}`,
-       saveDate: new Date().toISOString()
-      };
+// Save to gameState or localStorage
+if (gameState) {
+console.log('Saving to gameState...');
+gameState.updateState((state: any) => ({
+...state,
+fishCollection: currentFishCollection
+}));
 
-      const savedFishItem: SavedFish = {
-       id: fishId,
-       name: fishToSave.name,
-       saveDate: fishToSave.saveDate,
-       fishData: fishToSave,
-       species: fishToSave.species || 'unknown',
-       rarity: fishToSave.rarityGene ? `Tier ${fishToSave.rarityGene}` : 'Common',
-       generation: fishToSave.generation || 1,
-       timestamp: Date.now()
-      };
+// Force a save to storage
+gameState.save();
+console.log('Successfully saved to gameState');
 
-      // Check if fish already exists
-      const existingIndex = currentFishCollection.findIndex(fish => 
-        fish.id === fishId || 
-        fish.fishData?.originalId === fishData.originalId ||
-        fish.fishData?.id === fishData.originalId
-      );
+// Verify the update
+const updatedState = gameState.getState();
+console.log(`Game state now has ${updatedState.fishCollection?.length || 0} fish`);
+} else {
+// Fallback to localStorage
+console.log('Saving to localStorage...');
+localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(currentFishCollection));
+console.log('Successfully saved to localStorage');
+}
 
-      // Update or add the fish
-      if (existingIndex >= 0) {
-        console.log(`Updating existing fish at index ${existingIndex}`);
-        currentFishCollection[existingIndex] = savedFishItem;
-      } else {
-        console.log('Adding new fish to collection');
-        currentFishCollection.push(savedFishItem);
-      }
+// Force refresh the collection view
+setTimeout(() => {
+console.log('Refreshing collection view...');
+this.refreshCollection();
+}, 100);
 
-      // Save to gameState or localStorage
-      if (gameState) {
-        console.log('Saving to gameState...');
-        gameState.updateState((state: any) => ({
-          ...state,
-          fishCollection: currentFishCollection
-        }));
+return savedFishItem;
 
-        // Force a save to storage
-        gameState.save();
-        console.log('Successfully saved to gameState');
+} catch (error) {
+console.error('Error saving fish to collection:', error);
+toast('Failed to save fish to collection', true);
+return null;
+}
+}
 
-        // Verify the update
-        const updatedState = gameState.getState();
-        console.log(`Game state now has ${updatedState.fishCollection?.length || 0} fish`);
-      } else {
-        // Fallback to localStorage
-        console.log('Saving to localStorage...');
-        localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(currentFishCollection));
-        console.log('Successfully saved to localStorage');
-      }
-
-      // Force refresh the collection view
-      setTimeout(() => {
-        console.log('Refreshing collection view...');
-        this.refreshCollection();
-      }, 100);
-
-      return savedFishItem;
-
-    } catch (error) {
-      console.error('Error saving fish to collection:', error);
-      toast('Failed to save fish to collection', true);
-      return null;
-    }
-  }
-
-  /**
-   * Spawn a fish from saved data into the tank
-   */
-  public spawnFishFromData(): boolean {
-    try {
-      // Find the global fish array and other necessary variables
-      // @ts-ignore - Accessing global variables from the game
-      const fish = window.fish;
-      if (!fish || !Array.isArray(fish)) {
-        console.error('Could not find fish array');
-        toast('Failed to add fish to tank', true);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error spawning fish:', error);
+/**
+* Spawn a fish from saved data into the tank
+*/
+public spawnFishFromData(): boolean {
+  try {
+    // Find the global fish array and other necessary variables
+    // @ts-ignore - Accessing global variables from the game
+    const fish = window.fish;
+    if (!fish || !Array.isArray(fish)) {
+      console.error('Could not find fish array');
       toast('Failed to add fish to tank', true);
       return false;
     }
+    return true;
+  } catch (error) {
+    console.error('Error spawning fish:', error);
+    toast('Failed to add fish to tank', true);
+    return false;
   }
 }
 

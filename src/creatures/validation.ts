@@ -3,6 +3,10 @@
 // ===============================
 import type { CreatureBase } from "./types";
 import { getSpecies } from "./registry";
+import { storageManager } from "../utils/localStorageManager";
+
+// Note: This module now only handles validation and in-memory updates
+// All persistence to storage should be handled by the storage manager's save cycle
 
 interface ValidationResult<T> {
   validated: T;
@@ -134,19 +138,33 @@ export function validateAndUpdateCreature(
 ): CreatureBase {
   const { validated, wasModified } = validateCreature(creature, worldWidth, worldHeight);
   
-  // If any changes were made during validation, update localStorage
-  if (wasModified && typeof window !== 'undefined' && window.localStorage) {
+  // If any changes were made during validation, update the fish in the in-memory collection
+  if (wasModified) {
     try {
-      const savedFish = JSON.parse(localStorage.getItem('caroles_reef_saved_fish') || '[]');
-      const fishIndex = savedFish.findIndex((f: any) => f.fishData?.id === validated.id);
+      const currentData = storageManager.getCurrentData();
+      const fishIndex = currentData.fishCollection?.findIndex((f: any) => f.fishData?.id === validated.id);
       
-      if (fishIndex !== -1) {
-        // Update the fish data in the saved array
-        savedFish[fishIndex].fishData = validated;
-        localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
+      if (fishIndex !== undefined && fishIndex !== -1) {
+        // Update the fish in the collection
+        // FIXME: why are we using storageManager.getCurrentData here? We should already have the data to validate being passed in to us!
+        const currentData = storageManager.getCurrentData() as any; // Cast to any to bypass readonly
+        const updatedCollection = [...(currentData.fishCollection || [])];
+        const fishIndex = updatedCollection.findIndex((fish: any) => fish.id === validated.id);
+        
+        if (fishIndex !== -1) {
+          updatedCollection[fishIndex] = {
+            ...updatedCollection[fishIndex],
+            fishData: validated,
+            timestamp: Date.now()
+          };
+          
+          // Update the in-memory data without persisting to storage
+          // Persistence to storage will be handled by the storage manager's save cycle
+          currentData.fishCollection = updatedCollection;
+        }
       }
     } catch (error) {
-      console.error('Error updating fish in localStorage:', error);
+      console.error('Error updating fish in memory:', error);
     }
   }
   
@@ -164,20 +182,23 @@ export function validateFishFinShape(fishData: any): any {
   const updatedFish = { ...fishData };
   
   // Check if fin shape is valid
-  if (!validFins.includes(updatedFish.finShape)) {
+  if (updatedFish.finShape && !validFins.includes(updatedFish.finShape)) {
     updatedFish.finShape = 'fan';
     
-    // If this is a saved fish with an ID, update it in localStorage
+    // If this is a saved fish with an ID, update it in the in-memory collection
     if (updatedFish.id) {
       try {
-        const savedFish = JSON.parse(localStorage.getItem('savedFish') || '[]');
-        const index = savedFish.findIndex((f: any) => f.id === updatedFish.id);
-        if (index !== -1) {
-          savedFish[index] = updatedFish;
-          localStorage.setItem('savedFish', JSON.stringify(savedFish));
-        }
+        // FIXME: why are we using storageManager.getCurrentData here? We should already have the data to validate being passed in to us!
+        const currentData = storageManager.getCurrentData() as any; // Cast to any to bypass readonly
+        const updatedCollection = (currentData.fishCollection || []).map((fish: any) => 
+          fish.id === updatedFish.id ? { ...fish, fishData: updatedFish, timestamp: Date.now() } : fish
+        );
+        
+        // Update the in-memory data without persisting to storage
+        // Persistence to storage will be handled by the storage manager's save cycle
+        (currentData as any).fishCollection = updatedCollection;
       } catch (error) {
-        console.error('Error updating fish in localStorage:', error);
+        console.error('Error updating fish in memory:', error);
       }
     }
   }

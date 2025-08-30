@@ -1,0 +1,242 @@
+# Active Files in Carole's Reef Project
+# All needed files for the player experience are listed here.
+
+## Data Persistence Architecture
+
+### Overview
+The application uses a centralized persistence model where:
+1. All data modifications happen in-memory
+2. Persistence to localStorage is managed explicitly through the storage manager
+3. Data validation occurs before persistence
+
+### Key Components
+- **In-Memory Updates**:
+  - `FishManager` and `validation.ts` update only in-memory data
+  - No direct localStorage writes during normal operations
+  - Immediate UI feedback without storage latency
+
+- **Controlled Persistence**:
+  - `localStorageManager` handles all storage operations
+  - `BackupManager` manages backup/restore with validation
+  - Explicit save points (e.g., backup restoration)
+
+- **Data Flow**:
+  1. UI actions update in-memory state
+  2. Changes are immediately reflected in the UI
+  3. Storage operations are queued and batched
+  4. Validation occurs before persistence
+  5. Storage operations complete asynchronously
+
+### Important Notes
+- Direct `localStorage` access is deprecated
+- All storage operations should go through `storageManager`
+- Data validation is required before persistence
+- Backup operations are the primary persistence trigger
+
+## Core Application
+- index.html - Main HTML entry point
+   * REQUIRES: /favicon.ico, src/styles/style.css, src/main.ts
+   * USED-BY: (none - main entry point)
+- src/main.ts - Main TypeScript entry point
+   * REQUIRES: ./audio/audioManager.ts, ./core/events.ts, ./legacy/runLegacyGame.ts
+   * USED-BY: /index.html
+- src/core/events.ts - Event bus implementation
+   * REQUIRES: (none)
+   * USED-BY: src/main.ts, src/core/input.ts, src/audio/audioManager.ts
+- src/core/input.ts - Input handling
+   * REQUIRES: ./events.ts
+   * USED-BY: (none)
+- src/core/env.ts - Environment management and global state
+   * REQUIRES: (none)
+   * USED-BY: src/creatures/feeding.ts, src/game/creatureLoop.ts, src/creatures/factory.ts
+
+## Audio
+- src/audio/audioManager.ts - Audio management
+   * REQUIRES: howler (npm), ../core/events.ts, ./sfx.ts
+   * USED-BY: src/main.ts
+- src/audio/sfx.ts - Sound effects configuration
+   * REQUIRES: /audio/eat.mp3, /audio/click.mp3
+   * USED-BY: src/audio/audioManager.ts
+- src/audio/bus.ts - Audio bus implementation
+   * REQUIRES: (none)
+   * USED-BY: (none)
+
+## Legacy Game Code
+- src/legacy/runLegacyGame.ts - Main legacy game loop
+   * REQUIRES: howler (npm), src/entities/fish.ts, src/utils/audio.ts, src/entities/decor.ts, src/render/background.ts, src/render/decorRenderer.ts, src/config/themes.ts, src/creatures/validation.ts (dynamic), src/ui/FishCollection.ts (dynamic)
+   * USED-BY: src/main.ts
+   * PERSISTENCE: Updates in-memory data only
+
+## Entities
+- src/entities/creature.ts - Base creature type definitions and interfaces
+   * REQUIRES: (none)
+   * USED-BY: src/state/types.ts, src/state/selectors.ts
+- src/entities/fish.ts - Fish entity logic and behavior
+   * REQUIRES: src/utils/audio.ts, src/ui/FishCollection.ts (dynamic), src/utils/localStorageManager.ts
+   * USED-BY: src/legacy/runLegacyGame.ts, src/creatures/feeding.ts (dynamic)
+   * PERSISTENCE: Updates in-memory data only
+- src/entities/pellet.ts - Food pellets for fish
+   * REQUIRES: (none)
+   * USED-BY: (none)
+- src/entities/bubbles.ts - Bubble effects
+   * REQUIRES: (none)
+   * USED-BY: (none)
+- src/entities/decor.ts - Decorations and environment
+   * REQUIRES: src/state/types.ts
+   * USED-BY: src/legacy/runLegacyGame.ts
+
+## Game Logic
+- src/game/creatureLoop.ts - Manages creature updates and rendering
+   * REQUIRES: src/core/env.ts, src/creatures/index.ts, src/creatures/registry.ts, src/creatures/death.ts, src/creatures/constants.ts
+   * USED-BY: (none)
+
+## Engine
+- src/engine/math.ts - Math utility functions (rand, randi, clamp)
+   * REQUIRES: (none)
+   * USED-BY: (none)
+- src/engine/spatial/index.ts - Spatial indexing exports
+   * REQUIRES: ./quadtree.ts
+   * USED-BY: (none)
+- src/engine/spatial/quadtree.ts - Quadtree implementation for spatial partitioning
+   * REQUIRES: (none)
+   * USED-BY: src/engine/spatial/index.ts
+
+## Creatures
+- src/creatures/index.ts - Central exports for creature-related modules
+   * REQUIRES: ./types.ts, ./registry.ts, ./factory.ts, ./movement.ts, ./feeding.ts, ./rendering.ts, ./breeding.ts
+   * USED-BY: src/game/creatureLoop.ts
+- src/creatures/validation.ts - Fish data validation
+   * REQUIRES: ./types.ts, ./registry.ts, ../utils/fishStorage.ts, ../utils/localStorageManager.ts
+   * USED-BY: src/legacy/runLegacyGame.ts (dynamic)
+   * PERSISTENCE: Updates in-memory data only
+- src/creatures/factory.ts - Creature creation factory
+   * REQUIRES: ./registry.ts, ./genetics/base.ts, ./types.ts, ./validation.ts, src/core/env.ts
+   * USED-BY: src/creatures/index.ts
+- src/creatures/breeding.ts - Creature breeding logic
+   * REQUIRES: ./types.ts, ./registry.ts
+   * USED-BY: src/creatures/index.ts
+- src/creatures/death.ts - Death and corpse handling
+   * REQUIRES: ./types.ts, ./registry.ts, ./constants.ts
+   * USED-BY: src/game/creatureLoop.ts
+- src/creatures/feeding.ts - Creature feeding behavior
+   * REQUIRES: ./types.ts, ./registry.ts, ../core/env.ts, ./constants.ts, src/entities/fish.ts (dynamic)
+   * USED-BY: src/creatures/index.ts
+- src/creatures/constants.ts - Game constants and tunables
+   * REQUIRES: (none)
+   * USED-BY: src/creatures/feeding.ts, src/creatures/death.ts, src/game/creatureLoop.ts
+- src/creatures/registerAll.ts - Registers all creature species
+   * REQUIRES: ./species/clownfish.ts, ./species/fireshrimp.ts, ./species/reefshark.ts
+   * USED-BY: (none)
+- src/creatures/genetics/base.ts - Base genetics implementation
+   * REQUIRES: ../types.ts, ../utils.ts
+   * USED-BY: src/creatures/factory.ts
+- src/creatures/registry.ts - Species registry
+   * REQUIRES: ./types.ts
+   * USED-BY: src/creatures/index.ts, src/creatures/validation.ts, src/creatures/factory.ts, src/creatures/breeding.ts, src/creatures/movement.ts, src/creatures/death.ts, src/creatures/rendering.ts, src/creatures/species/clownfish.ts, src/creatures/species/fireshrimp.ts, src/creatures/species/reefshark.ts, src/game/creatureLoop.ts
+- src/creatures/types.ts - Creature and species types
+   * REQUIRES: (none)
+   * USED-BY: src/creatures/validation.ts, src/creatures/factory.ts, src/creatures/breeding.ts, src/creatures/death.ts, src/creatures/rendering.ts, src/creatures/movement.ts, src/creatures/genetics/base.ts, src/creatures/species/clownfish.ts, src/creatures/species/fireshrimp.ts, src/creatures/species/reefshark.ts, src/creatures/species/renderers/fireshrimpDraw.ts, src/creatures/species/renderers/reefsharkDraw.ts
+- src/creatures/utils.ts - Helpers for movement/genetics
+   * REQUIRES: (none)
+   * USED-BY: src/creatures/movement.ts, src/creatures/genetics/base.ts
+- src/creatures/species/clownfish.ts - Clownfish species definition
+   * REQUIRES: ../types.ts, ../registry.ts, ./renderers/clownfishDraw.ts
+   * USED-BY: src/creatures/registerAll.ts
+- src/creatures/species/fireshrimp.ts - Fireshrimp species definition
+   * REQUIRES: ../types.ts, ../registry.ts, ./renderers/fireshrimpDraw.ts
+   * USED-BY: src/creatures/registerAll.ts
+- src/creatures/species/reefshark.ts - Reefshark species definition
+   * REQUIRES: ../types.ts, ../registry.ts, ./renderers/reefsharkDraw.ts
+   * USED-BY: src/creatures/registerAll.ts
+- src/creatures/species/renderers/clownfishDraw.ts - Clownfish rendering logic
+   * REQUIRES: (none)
+   * USED-BY: src/creatures/species/clownfish.ts
+- src/creatures/species/renderers/fireshrimpDraw.ts - Fireshrimp rendering logic
+   * REQUIRES: ../../types.ts
+   * USED-BY: src/creatures/species/fireshrimp.ts
+- src/creatures/species/renderers/reefsharkDraw.ts - Reefshark rendering logic
+   * REQUIRES: ../../types.ts
+   * USED-BY: src/creatures/species/reefshark.ts
+- src/creatures/species.ts - Species config interface (unused)
+   * REQUIRES: (none)
+   * USED-BY: (none)
+
+## UI Components
+- src/ui/FishCollection.ts - Manages the fish collection UI
+  * REQUIRES: src/utils/fishStorage.ts, ./FishCard.ts, ./toast.ts
+  * USED-BY: src/ui/FishCardActions.ts, src/entities/fish.ts (dynamic), src/legacy/runLegacyGame.ts (dynamic)
+- src/ui/FishCardActions.ts - Handles fish card action buttons
+  * REQUIRES: src/utils/fishStorage.ts, ./FishCollection.ts, ./FishCollection.ts (dynamic)
+  * USED-BY: (none)
+- src/ui/FishCard.ts - Displays individual fish cards
+  * REQUIRES: (none)
+  * USED-BY: src/ui/FishCollection.ts
+- src/ui/toast.ts - Toast notification system
+  * REQUIRES: (none)
+  * USED-BY: src/ui/FishCollection.ts
+
+## Rendering
+- src/render/background.ts - Background rendering
+  * REQUIRES: ../config/themes.ts, ../config/backgrounds.ts
+  * USED-BY: src/legacy/runLegacyGame.ts, src/render/draw.ts
+- src/render/decorRenderer.ts - Decoration rendering
+  * REQUIRES: src/state/types.ts
+  * USED-BY: src/legacy/runLegacyGame.ts
+- src/render/draw.ts - Frame rendering orchestrator
+  * REQUIRES: src/core/events.ts, src/state/types.ts, ./background.ts, ./creatureRenderers/fishRenderer.ts
+  * USED-BY: (none)
+- src/render/creatureRenderers/fishRenderer.ts - Fish creature renderer
+  * REQUIRES: src/entities/creature.ts
+  * USED-BY: src/render/draw.ts
+- src/render/pelletsRenderer.ts - Pellets renderer
+  * REQUIRES: (none)
+  * USED-BY: (none)
+- src/render/bubblesRenderer.ts - Bubbles renderer
+  * REQUIRES: (none)
+  * USED-BY: (none)
+
+## Configuration
+- src/utils/fishStorage.ts - Fish storage utilities
+   * REQUIRES: ./localStorageManager.ts
+   * USED-BY: src/ui/FishCollection.ts, src/legacy/runLegacyGame.ts, src/creatures/validation.ts
+   * PERSISTENCE: Updates in-memory data only
+- src/config/backgrounds.ts - Background configurations
+  * REQUIRES: (none)
+  * USED-BY: src/render/background.ts
+- src/config/constants.ts - Game constants
+  * REQUIRES: (none)
+  * USED-BY: (none)
+
+## Utilities
+- src/utils/localStorageManager.ts - Centralized localStorage management
+   * REQUIRES: (none)
+   * USED-BY: src/main.ts, src/creatures/validation.ts, src/entities/fish.ts, src/utils/fishStorage.ts, src/utils/BackupManager.ts
+   * PERSISTENCE: Single point of contact for all localStorage operations
+   * Manages data versioning and migration
+   * Handles serialization/deserialization
+- src/utils/BackupManager.ts - Backup and restore functionality
+   * REQUIRES: ./localStorageManager.ts, ./fishStorage.ts
+   * USED-BY: src/ui/BackupManagerUI.ts
+   * PERSISTENCE: Handles explicit save operations with validation
+   * Validates data before persisting to localStorage
+- src/utils/audio.ts - Audio utilities
+   * REQUIRES: howler (npm)
+   * USED-BY: src/legacy/runLegacyGame.ts, src/entities/fish.ts
+
+## Styles
+- src/styles/style.css - Main stylesheet
+  * REQUIRES: (none)
+  * USED-BY: /index.html
+
+## Public Assets
+- public/favicon.ico - Website favicon
+- public/audio/born.mp3 - Sound played when a new fish is born
+- public/audio/caroles_reef_bkgd_music_track_01.mp3 - Background music track 1
+- public/audio/caroles_reef_bkgd_music_track_02.mp3 - Background music track 2
+- public/audio/dead.mp3 - Sound played when a fish dies
+- public/audio/release.mp3 - Sound played when a fish is released
+- public/audio/yippie.ogg - Sound effect for happy events
+- public/images/Caroles_Reef-01.png - Game logo/art 1
+- public/images/Caroles_Reef-02.png - Game logo/art 2
+- public/images/Caroles_Reef-03.png - Game logo/art 3
+- public/images/tank_background01.png - Main tank background image

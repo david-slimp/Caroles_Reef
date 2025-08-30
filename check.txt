@@ -1,0 +1,70 @@
+src/audio/audioManager.ts
+src/audio/bus.ts
+src/audio/sfx.ts
+src/config/backgrounds.ts
+src/config/themes.ts
+src/core/events.ts
+src/creatures/registry.ts
+src/creatures/validation.ts
+- Line 140-146: validateAndUpdateCreature()
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Updates existing fish data after validation
+  - Purpose: Ensures saved fish data remains valid
+- Line 170-181: validateFishFinShape()
+  - Key: 'savedFish' (legacy key)
+  - Action: Updates fin shape in storage if invalid
+  - Purpose: Maintains data consistency for fish fin shapes
+src/entities/creature.ts
+src/entities/decor.ts
+src/entities/fish.ts
+- Line 404-416: UpdateFishInCollection())
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Updates fish data in storage
+  - Purpose: Syncs fish state changes to storage
+src/legacy/runLegacyGame.ts
+- Line 428-429: (in rename handler)
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Saves updated fish name
+  - Purpose: Persists fish name changes in the legacy UI
+src/main.ts
+src/render/background.ts
+src/render/decorRenderer.ts
+src/state/types.ts
+src/styles/style.css
+src/ui/FishCard.ts
+src/ui/FishCollection.ts
+- Line 610: getSavedFish()
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Retrieves all saved fish
+  - Purpose: Loads fish collection for display
+- Line 640: (in removeFish())
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Removes a fish from storage
+  - Purpose: Deletes fish from collection
+- Line 763: (in rename handler)
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Updates fish name in storage
+  - Purpose: Persists fish name changes
+- Line 861: (in saveFish())
+  - Key: 'caroles_reef_saved_fish'
+  - Action: Saves new or updated fish
+  - Purpose: Adds/updates fish in collection
+src/ui/toast.ts
+src/utils/audio.ts
+src/utils/fishStorage.ts
+- Line 43: saveFish()
+  - Key: 'caroles_reef_saved_fish' (STORAGE_KEY)
+  - Action: Saves a fish to storage
+  - Purpose: Centralized fish storage
+- Line 57: getSavedFish()
+  - Key: 'caroles_reef_saved_fish' (STORAGE_KEY)
+  - Action: Retrieves all saved fish
+  - Purpose: Loads fish collection
+- Line 72: removeFish()
+  - Key: 'caroles_reef_saved_fish' (STORAGE_KEY)
+  - Action: Removes a fish by ID
+  - Purpose: Deletes fish from storage
+- Line 85: clearAllSavedFish()
+  - Key: 'caroles_reef_saved_fish' (STORAGE_KEY)
+  - Action: Clears all fish data
+  - Purpose: Resets fish collection

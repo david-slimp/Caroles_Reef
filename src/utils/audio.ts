@@ -15,7 +15,7 @@ const audioState: Record<AudioChannel, AudioState> = {
 
 let backgroundMusic: HTMLAudioElement | null = null;
 let hasUserInteracted = false;
-const BACKGROUND_MUSIC_FILE = 'caroles_reef_bkgd_music.mp3';
+const BACKGROUND_MUSIC_FILE = 'caroles_reef_bkgd_music_track_02.mp3';
 
 // Listen for user interaction to enable audio
 const handleUserInteraction = () => {

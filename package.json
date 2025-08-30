@@ -38,7 +38,8 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "howler": "^2.2.4"
+    "howler": "^2.2.4",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",

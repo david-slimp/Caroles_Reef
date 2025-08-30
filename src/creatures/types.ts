@@ -1,68 +1,72 @@
 // ===============================
 // src/creatures/types.ts
 // ===============================
-export type Sex = "M" | "F";
-export type LifeState = "alive" | "dead";
-export type BehaviorState = "wander" | "seekFood" | "seekMate" | "ritual" | "flee";
 
+/**
+ * Base interface for all creature types in the game
+ */
 export interface CreatureBase {
   id: string;
   speciesId: string;
   name?: string;
-  x: number; y: number; vx: number; vy: number; dir: number;
-  age: number; favorite?: boolean;
-  life: LifeState;
-  state: BehaviorState;
-
-  // generic genetics / body
-  sex?: Sex;
-  size: number; maxSize: number; birthSize: number;
-  speedGene?: number; senseGene?: number; hungerGene?: number; rarityGene?: number;
-  // Visual attributes
-  colorHue?: number;
-  patternType?: string;
-  /**
-   * The shape of the fish's tail/fin
-   * - pointy: Sharp, narrow tail that tapers to a point
-   * - round: Smooth, rounded tail
-   * - fan: Wide, fan-shaped tail
-   * - forked: Tail with a distinct notch in the middle (like a tuna)
-   * - lunate: Crescent moon-shaped tail (like a mackerel)
-   */
-  finShape?: 'pointy' | 'round' | 'fan' | 'forked' | 'lunate';
-  eyeType?: string;
-
-  // breeding state
-  _breedCd?: number;
-  _mateId?: string | null;
-  _ritualTimer?: number;
-
-  // corpse / bites (optional)
-  _bites?: { x: number; y: number; r: number }[];
-  _corpseArea?: number;
-
-  // misc
-  shiny?: boolean;
-}
-
-
-export interface SpeciesConfig {
-  id: string; displayName: string;
-  layer: "swimmer" | "crawler" | "pelagic";
-  breedable: boolean;
-  diet: "pellets" | "scavenger" | "predator" | "omnivore";
-  movement: { integrator: "swim2D" | "crawl2D" | "sharkPatrol2D"; homeRadius: number; vmax: number; turnRate: number; buoyancy?: number };
-  genetics: { 
-    traits: string[]; 
-    minAdultAgeSec: number; 
-    minAdultSizeFrac: number; 
-    mutationRate: number;
-    traitRanges?: {
-      [trait: string]: { min: number; max: number; default: number };
-    };
+  x: number;
+  y: number;
+  size: number;
+  maxSize: number;
+  birthSize: number;
+  speed: number;
+  direction: number;
+  energy: number;
+  health: number;
+  age: number;
+  sex: 'male' | 'female';
+  generation: number;
+  parents?: {
+    motherId?: string;
+    fatherId?: string;
   };
-  spawning: { litterMin: number; litterMax: number };
-  art: { draw: (ctx: CanvasRenderingContext2D, c: CreatureBase) => void; drawCorpse?: (ctx: CanvasRenderingContext2D, c: CreatureBase) => void };
-  hooks?: Partial<{ onSpawn: (c: CreatureBase) => void; onDeath: (c: CreatureBase) => void; onEat: (c: CreatureBase, food: any) => void; chooseMate: (self: CreatureBase, candidates: CreatureBase[]) => CreatureBase | null; breedingRule: (a: CreatureBase, b: CreatureBase) => boolean; movementTick: (c: CreatureBase, dt: number) => void }>;
+  // Add any other common properties here
+  [key: string]: any;
 }
 
+/**
+ * Configuration for a species of creature
+ */
+export interface SpeciesConfig {
+  id: string;
+  displayName: string;
+  description: string;
+  baseSpeed: number;
+  baseSize: number;
+  baseHealth: number;
+  baseEnergy: number;
+  genetics: {
+    traitRanges?: {
+      [trait: string]: {
+        min: number;
+        max: number;
+        default: number;
+      };
+    };
+    // Add any other genetic configuration here
+  };
+  // Add any other species-specific configuration here
+  [key: string]: any;
+}
+
+/**
+ * Type for fish-specific creature data
+ */
+export interface FishData extends CreatureBase {
+  finShape?: 'pointy' | 'round' | 'fan' | 'forked' | 'lunate';
+  patternType?: string;
+  colorHue?: number;
+  senseGene?: number;
+  hungerDrive?: number;
+  rarityGene?: number;
+  constitution?: number;
+  shiny?: boolean;
+  favorite?: boolean;
+  dead?: boolean;
+  originalId?: string;
+}
