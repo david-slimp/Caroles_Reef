@@ -8,37 +8,123 @@ Carole's Reef is an aquarium simulation featuring procedurally generated fish wi
 
 ### Data Flow
 
-```fish
+```mermaid
 graph TD
     A[User Input] --> B[Input System]
     B --> C[Game State]
     C --> D[Game Systems]
     D --> E[Rendering]
     D --> C
+    
+    subgraph "Persistence Layer"
+        F[localStorageManager] <--> G[localStorage]
+        H[gameDataValidator] <--> F
+    end
+    
+    C <--> F
+    H -. Validates .-> C
 ```
 
-### Key Components
+## State Management
 
-#### State Management
+### GameState (Single Source of Truth)
+- **Location**: `/state/GameState.ts`
+- **Purpose**: Centralized management of all game state
+- **Key Responsibilities**:
+  - Maintains in-memory game state
+  - Manages subscriptions to state changes
+  - Handles state updates in an immutable way
+  - Coordinates with persistence layer
 
-- Single source of truth in `/state/store.ts`
-- Immutable updates via actions
-- Selectors for derived state
+### State Structure
+```typescript
+interface GameState {
+  version: string;
+  lastSaved: number;
+  gameState: {
+    gameTime: number;
+    currentScene: string;
+    score: number;
+  };
+  settings: {
+    volume: number;
+    sfxMuted: boolean;
+    musicMuted: boolean;
+    musicTrack: string;
+    theme: string;
+    uiScale: number;
+  };
+  tank: {
+    background: string;
+    decorations: any[];
+  };
+  progress: {
+    unlocked: string[];
+    flags: Record<string, boolean>;
+  };
+  fishCollection: FishCollectionItem[];
+}
+```
 
-#### Rendering
+## Data Flow & Persistence
 
-- Pure functions that take state and render to canvas
-- Separate from game logic
-- Optimized for performance
+### Loading Data
+1. `localStorageManager.load()` retrieves raw data from localStorage
+2. `gameDataValidator` validates and transforms the raw data
+3. Validated data is passed to `gameState.load()`
+4. `gameState` updates internal state and notifies subscribers
 
-#### Systems
+### Saving Data
+1. `gameState.save()` prepares data for persistence
+2. Converts internal state to `GameSaveData` format
+3. Calls `storageManager.save()` with the prepared data
+4. `storageManager` handles the actual localStorage operations
 
-- Stateless functions that transform game state
-- Run in a fixed update loop
-- Can be tested in isolation
+## Validation Layer
+
+### gameDataValidator
+- **Location**: `/src/utils/gameDataValidator.ts`
+- **Responsibilities**:
+  - Validates all game data before it enters the state
+  - Handles data migration between versions
+  - Ensures data integrity and consistency
+  - Provides default values for missing data
+
+## Storage Layer
+
+### localStorageManager
+- **Location**: `/src/utils/localStorageManager.ts`
+- **Key Features**:
+  - Only module that directly interacts with `localStorage`
+  - Handles serialization/deserialization
+  - Manages storage keys and versioning
+  - Implements backup/restore functionality
 
 ## Performance Considerations
 
-- Spatial partitioning for collision detection
-- Object pooling for frequently created/destroyed entities
-- Efficient rendering with canvas optimizations
+- **State Updates**:
+  - Batched updates to minimize re-renders
+  - Selective subscription model for components
+  
+- **Memory Management**:
+  - Efficient data structures for fish collection
+  - Object pooling for frequently created/destroyed entities
+  
+- **Rendering**:
+  - Canvas-based rendering for optimal performance
+  - Spatial partitioning for collision detection
+  - Efficient rendering with requestAnimationFrame
+
+## Best Practices
+
+1. **State Updates**:
+   - Use `gameState.updateState()` for all state modifications
+   - Keep state updates minimal and batched when possible
+
+2. **Data Validation**:
+   - All external data must be validated before entering the game state
+   - Use `gameDataValidator` for all data validation needs
+
+3. **Persistence**:
+   - Only `localStorageManager` should interact with `localStorage`
+   - Use the provided save/load methods in `GameState` for persistence

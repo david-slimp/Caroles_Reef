@@ -11,7 +11,7 @@ The application uses a centralized persistence model where:
 
 ### Key Components
 - **In-Memory Updates**:
-  - `FishManager` and `validation.ts` update only in-memory data
+  - `FishManager` updates only in-memory data
   - No direct localStorage writes during normal operations
   - Immediate UI feedback without storage latency
 
@@ -63,7 +63,7 @@ The application uses a centralized persistence model where:
 
 ## Legacy Game Code
 - src/legacy/runLegacyGame.ts - Main legacy game loop
-   * REQUIRES: howler (npm), src/entities/fish.ts, src/utils/audio.ts, src/entities/decor.ts, src/render/background.ts, src/render/decorRenderer.ts, src/config/themes.ts, src/creatures/validation.ts (dynamic), src/ui/FishCollection.ts (dynamic)
+   * REQUIRES: howler (npm), src/entities/fish.ts, src/utils/audio.ts, src/entities/decor.ts, src/render/background.ts, src/render/decorRenderer.ts, src/config/themes.ts, src/ui/FishCollection.ts (dynamic)
    * USED-BY: src/main.ts
    * PERSISTENCE: Updates in-memory data only
 
@@ -105,12 +105,8 @@ The application uses a centralized persistence model where:
 - src/creatures/index.ts - Central exports for creature-related modules
    * REQUIRES: ./types.ts, ./registry.ts, ./factory.ts, ./movement.ts, ./feeding.ts, ./rendering.ts, ./breeding.ts
    * USED-BY: src/game/creatureLoop.ts
-- src/creatures/validation.ts - Fish data validation
-   * REQUIRES: ./types.ts, ./registry.ts, ../utils/fishStorage.ts, ../utils/localStorageManager.ts
-   * USED-BY: src/legacy/runLegacyGame.ts (dynamic)
-   * PERSISTENCE: Updates in-memory data only
 - src/creatures/factory.ts - Creature creation factory
-   * REQUIRES: ./registry.ts, ./genetics/base.ts, ./types.ts, ./validation.ts, src/core/env.ts
+   * REQUIRES: ./registry.ts, ./genetics/base.ts, ./types.ts, src/core/env.ts
    * USED-BY: src/creatures/index.ts
 - src/creatures/breeding.ts - Creature breeding logic
    * REQUIRES: ./types.ts, ./registry.ts

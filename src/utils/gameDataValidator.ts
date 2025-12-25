@@ -82,6 +82,15 @@ export function validateAndTransformGameData<T = GameSaveData>(
     validated.fish = [];
   }
 
+  // Transform and validate fish collection data
+  if (Array.isArray(validated.fishCollection)) {
+    validated.fishCollection = validated.fishCollection
+      .map((item: FishCollectionItem) => validateAndTransformFishCollectionItem(item, timestamp))
+      .filter(Boolean);
+  } else {
+    validated.fishCollection = [];
+  }
+
   // Transform and validate tank data
   if (!validated.tank || typeof validated.tank !== 'object') {
     validated.tank = { background: 'default', decorations: [] };
@@ -153,6 +162,19 @@ interface FishData {
 }
 
 /**
+ * Interface for fish collection item structure
+ */
+interface FishCollectionItem {
+  id?: string;
+  fishData?: FishData;
+  timestamp?: number;
+  name?: string;
+  saveDate?: string;
+  species?: string;
+  [key: string]: any;
+}
+
+/**
  * Validates and transforms a single fish object to ensure it matches the expected structure.
  * Handles migration of legacy formats, sets defaults, and ensures all values are within valid ranges.
  * 
@@ -176,12 +198,11 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   const inputFish = fish as Partial<FishData>;
   
   // Handle legacy fish format (pre-gene system)
-  const fishWithLegacyCheck = { ...inputFish };
-  if (!fishWithLegacyCheck.genes && 
-      (('color' in fishWithLegacyCheck) || 
-       ('pattern' in fishWithLegacyCheck) || 
-       ('speed' in fishWithLegacyCheck))) {
-    return migrateLegacyFish(fishWithLegacyCheck);
+  let fishWithLegacyCheck = { ...inputFish };
+  const legacySpeed = typeof fishWithLegacyCheck.speed === 'number' && fishWithLegacyCheck.speed <= 2;
+  const hasLegacyAppearance = ('color' in fishWithLegacyCheck) || ('pattern' in fishWithLegacyCheck);
+  if (!fishWithLegacyCheck.genes && (hasLegacyAppearance || legacySpeed)) {
+    fishWithLegacyCheck = migrateLegacyFish(fishWithLegacyCheck as Record<string, any>);
   }
 
   // Create a new validated object with proper typing
@@ -257,18 +278,29 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   const genes = validated.genes;
   
   // Migrate old senseRadius to senseGene if needed
-  if (typeof genes.senseGene !== 'number' || !Number.isInteger(genes.senseGene) || genes.senseGene < 0 || genes.senseGene > 9) {
-    // If we have a legacy senseRadius, convert it to senseGene (radius/20, then clamp to 0-9)
+  if (typeof genes.senseGene !== 'number' || !Number.isInteger(genes.senseGene) || genes.senseGene < 1 || genes.senseGene > 9) {
+  // If we have a legacy senseRadius, convert it to senseGene.
     if ('senseRadius' in validated) {
-      genes.senseGene = Math.min(9, Math.max(0, Math.round(validated.senseRadius / 20)));
+      const radiusValue = Number((validated as any).senseRadius);
+      const normalized = radiusValue < 10 ? radiusValue : Math.round(radiusValue / 20);
+      genes.senseGene = clampSenseGene(normalized);
       delete validated.senseRadius;
     } else if ('senseRadius' in genes) {
-      genes.senseGene = Math.min(9, Math.max(0, Math.round(genes.senseRadius / 20)));
+      const radiusValue = Number((genes as any).senseRadius);
+      const normalized = radiusValue < 10 ? radiusValue : Math.round(radiusValue / 20);
+      genes.senseGene = clampSenseGene(normalized);
       delete genes.senseRadius;
     } else {
       // Default value if neither exists
       genes.senseGene = 5; // Mid-range default
     }
+  }
+  // Always drop legacy senseRadius if it exists after normalization
+  if ('senseRadius' in validated) {
+    delete (validated as any).senseRadius;
+  }
+  if ('senseRadius' in genes) {
+    delete (genes as any).senseRadius;
   }
   
   // Gene ranges (0-9 for all genes)
@@ -278,7 +310,7 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
       // We know these are number properties based on our FishGenes interface
       const value = genes[key];
       if (typeof value === 'number') {
-        genes[key] = clampGene(value);
+        genes[key] = key === 'senseGene' ? clampSenseGene(value) : clampGene(value);
       } else {
         // If somehow it's not a number, set to default
         (genes as any)[key] = 5;
@@ -289,6 +321,20 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     }
   });
   
+  // If top-level appearance fields exist and genes are missing, use top-level values.
+  if (typeof validated.colorHue === 'number' && typeof genes.colorHue !== 'number') {
+    genes.colorHue = validated.colorHue;
+  }
+  if (typeof validated.patternType === 'string' && typeof genes.patternType !== 'string') {
+    genes.patternType = validated.patternType;
+  }
+  if (typeof validated.finShape === 'string' && typeof genes.finShape !== 'string') {
+    genes.finShape = validated.finShape;
+  }
+  if (typeof validated.eyeType === 'string' && typeof genes.eyeType !== 'string') {
+    genes.eyeType = validated.eyeType;
+  }
+
   // Color and appearance - ensure colorHue is in valid range [0, 360)
   if (typeof genes.colorHue === 'number') {
     genes.colorHue = ((genes.colorHue % 360) + 360) % 360; // Normalize to [0, 360)
@@ -316,6 +362,23 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     genes.finShape = validated.finShape;
     delete validated.finShape;
   }
+
+  // Normalize top-level gene fields to match validated genes
+  const topLevelGenes: Array<keyof FishGenes> = ['speed', 'senseGene', 'hungerDrive', 'rarityGene', 'constitution'];
+  topLevelGenes.forEach((key) => {
+    if (typeof validated[key] === 'number') {
+      validated[key] = key === 'senseGene' ? clampSenseGene(validated[key]) : clampGene(validated[key]);
+    } else {
+      (validated as any)[key] = genes[key];
+    }
+    genes[key] = (validated as any)[key];
+  });
+
+  // Normalize top-level appearance fields to match validated genes
+  validated.colorHue = genes.colorHue;
+  validated.patternType = genes.patternType;
+  validated.finShape = genes.finShape;
+  validated.eyeType = genes.eyeType;
   
   // Ensure canMate is a boolean (default: true)
   if (typeof validated.canMate !== 'boolean') {
@@ -338,6 +401,48 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   validated._breedCd = typeof validated._breedCd === 'number' ? validated._breedCd : 0;
   
   return validated;
+}
+
+/**
+ * Validates and transforms a fish collection item (wrapper around fish data).
+ * Ensures the embedded fishData is normalized and collection metadata exists.
+ */
+function validateAndTransformFishCollectionItem(
+  item: unknown,
+  timestamp: number
+): FishCollectionItem | null {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return null;
+  }
+
+  const input = item as FishCollectionItem;
+  const validatedFish = validateAndTransformFish(input.fishData ?? input, timestamp);
+  if (!validatedFish) {
+    return null;
+  }
+
+  const resolvedId = typeof input.id === 'string' && input.id
+    ? input.id
+    : validatedFish.id;
+  const resolvedTimestamp = typeof input.timestamp === 'number'
+    ? input.timestamp
+    : Date.now();
+
+  return {
+    ...input,
+    id: resolvedId,
+    name: typeof input.name === 'string' && input.name.trim()
+      ? input.name
+      : validatedFish.name || 'Unnamed',
+    species: typeof input.species === 'string' && input.species.trim()
+      ? input.species
+      : validatedFish.species || 'default',
+    saveDate: typeof input.saveDate === 'string' && input.saveDate
+      ? input.saveDate
+      : new Date(resolvedTimestamp).toISOString(),
+    timestamp: resolvedTimestamp,
+    fishData: validatedFish
+  };
 }
 
 /**
@@ -480,8 +585,16 @@ function clampGene(value: any, min: number = 0, max: number = 9): number {
   return Math.min(actualMax, Math.max(actualMin, num));
 }
 
+/**
+ * Clamps senseGene to the valid range (1-9).
+ */
+function clampSenseGene(value: any): number {
+  return clampGene(value, 1, 9);
+}
+
 export default {
   validateAndTransformGameData,
   validateAndTransformFish,
+  validateAndTransformFishCollectionItem,
   migrateLegacyFish
 };

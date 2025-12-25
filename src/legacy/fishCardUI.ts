@@ -5,7 +5,7 @@
  */
 import { playSound, Sounds } from '../utils/audio';
 import { isAdult } from '../entities/fish';
-import { storageManager } from '../utils/localStorageManager';
+import { gameState } from '../state/GameState';
 
 type Deps = {
   fish: any[];
@@ -16,9 +16,11 @@ type Deps = {
 
 export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps) {
   let selectedFish: any = null;
+  const breedingHud = ensureBreedingHud();
 
   function closeCard() {
     fishCardEl.style.display = 'none';
+    breedingHud.style.display = 'none';
     if (selectedFish) selectedFish.selected = false;
     selectedFish = null;
   }
@@ -58,6 +60,8 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     favBtn.textContent = f.favorite ? '★' : '☆';
     (favBtn as any).style.color = f.favorite ? '#ffd700' : '#888';
     favBtn.setAttribute('title', f.favorite ? 'Remove from favorites' : 'Add to favorites');
+
+    updateBreedingHud(f, fish);
   }
 
   async function showFishCard(f: any) {
@@ -113,7 +117,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       f.name = newName;
       toast('Fish renamed');
 
-      if (f.originalId) {
+      if (f.originalId || f.id) {
         try {
           const { fishCollection } = await import('../ui/FishCollection');
           const savedFish = fishCollection.getSavedFish();
@@ -123,8 +127,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
             if (savedFish[fishIndex].fishData) {
               savedFish[fishIndex].fishData.name = newName;
             }
-            const currentData = storageManager.getCurrentData();
-            currentData.fishCollection = savedFish;
+            gameState.updateState({ fishCollection: savedFish });
             if (fishCollection.isVisible()) {
               fishCollection.refreshCollection();
             }
@@ -135,6 +138,12 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       }
       refreshFishCard();
     };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        save.click();
+      }
+    });
 
     close.onclick = () => closeCard();
 
@@ -150,7 +159,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       try {
         const fishData: any = {
           id: f.id,
-          name: f.name || `Fish ${fish.length + 1}`,
+          name: f.name || 'NEW',
           species: f.species || 'unknown',
           colorHue: f.colorHue,
           patternType: f.patternType,
@@ -180,16 +189,13 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
         const { fishCollection } = await import('../ui/FishCollection');
         const saved = fishCollection.saveFish(fishData);
         if (saved) {
-          toast('Fish saved to collection!');
+          f.originalId = saved.id || f.originalId || f.id;
           saveToCollectionBtn.textContent = 'Saved to Collection';
           (saveToCollectionBtn as any).style.backgroundColor = '#2e7d32';
           saveToCollectionBtn.disabled = true;
-        } else {
-          toast('Failed to save fish to collection', true);
         }
       } catch (err) {
         console.error('Error saving fish to collection:', err);
-        toast('Error saving fish to collection', true);
       }
     };
 
@@ -200,6 +206,21 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       if (index !== -1) {
         tankFishIds.delete(selectedFish.originalId || selectedFish.id);
         fish.splice(index, 1);
+        const currentState = gameState.getState();
+        const fishInTank = [...(currentState.fishInTank || [])];
+        const fishInTankOriginalIds = [...(currentState.fishInTankOriginalIds || [])];
+        const fishIndex = fishInTank.findIndex((fishId) => fishId === selectedFish.id);
+        if (fishIndex >= 0) {
+          fishInTank.splice(fishIndex, 1);
+        }
+        const originalId = selectedFish.originalId;
+        if (originalId) {
+          const originalIndex = fishInTankOriginalIds.findIndex((savedId) => savedId === originalId);
+          if (originalIndex >= 0) {
+            fishInTankOriginalIds.splice(originalIndex, 1);
+          }
+        }
+        gameState.updateState({ fishInTank, fishInTankOriginalIds });
       }
       closeCard();
       toast('Fish has been released!');
@@ -213,4 +234,67 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
   }
 
   return { showFishCard, refreshIfVisible, close: closeCard };
+}
+
+function ensureBreedingHud(): HTMLElement {
+  let hud = document.getElementById('breedingHud');
+  if (hud) return hud;
+
+  hud = document.createElement('div');
+  hud.id = 'breedingHud';
+  hud.style.display = 'none';
+  document.body.appendChild(hud);
+  return hud;
+}
+
+function updateBreedingHud(f: any, tankFish: any[]): void {
+  const hud = document.getElementById('breedingHud');
+  if (!hud) return;
+
+  const mate = f._mateId ? tankFish.find((m: any) => m.id === f._mateId) : null;
+  const mateDistance = mate ? Math.hypot(mate.x - f.x, mate.y - f.y) : null;
+  const senseRadius = typeof f.senseGene === 'number' ? f.senseGene * 20 : 0;
+  const hungerRadius = typeof f.senseGene === 'number'
+    ? f.senseGene * ((f.hungerDrive || 0) * 2.1) + 5
+    : 0;
+  const adultAgeSec = 4 * 60;
+  const adultSize = (f.maxSize || 30) * 0.5;
+  const isAdult = typeof f.age === 'number' && typeof f.size === 'number'
+    ? f.age >= adultAgeSec && f.size >= adultSize
+    : false;
+  const ageRemaining = typeof f.age === 'number' ? Math.max(0, adultAgeSec - f.age) : null;
+  const sizeRemaining = typeof f.size === 'number' ? Math.max(0, adultSize - f.size) : null;
+  const maxFish = 60;
+  const canSeekMate = tankFish.length < maxFish;
+
+  hud.innerHTML = `
+    <div class="breeding-hud-title">Breeding HUD</div>
+    <div class="breeding-hud-line"><strong>ID:</strong> ${f.id}</div>
+    <div class="breeding-hud-line"><strong>Sex:</strong> ${f.sex || '—'} | <strong>Adult:</strong> ${isAdult ? 'yes' : 'no'}</div>
+    ${isAdult ? '' : `<div class="breeding-hud-line"><strong>Adult in:</strong> ${formatSeconds(ageRemaining)} | <strong>Size:</strong> ${formatNumber(sizeRemaining)}</div>`}
+    <div class="breeding-hud-line"><strong>State:</strong> ${f.state || '—'}</div>
+    <div class="breeding-hud-line"><strong>canMate:</strong> ${f.canMate === false ? 'no' : 'yes'}</div>
+    <div class="breeding-hud-line"><strong>Tank:</strong> ${tankFish.length}/${maxFish} | <strong>Seek Mate:</strong> ${canSeekMate ? 'yes' : 'no'}</div>
+    <div class="breeding-hud-line"><strong>_breedCd:</strong> ${formatNumber(f._breedCd)}</div>
+    <div class="breeding-hud-line"><strong>_eatCd:</strong> ${formatNumber(f._eatCd)}</div>
+    <div class="breeding-hud-line"><strong>_mateId:</strong> ${f._mateId || '—'}</div>
+    <div class="breeding-hud-line"><strong>_ritualTimer:</strong> ${formatNumber(f._ritualTimer)}</div>
+    <div class="breeding-hud-line"><strong>senseGene:</strong> ${formatNumber(f.senseGene)}</div>
+    <div class="breeding-hud-line"><strong>senseRadius:</strong> ${formatNumber(senseRadius)}</div>
+    <div class="breeding-hud-line"><strong>hungerRadius:</strong> ${formatNumber(hungerRadius)}</div>
+    <div class="breeding-hud-line"><strong>mateDistance:</strong> ${mateDistance != null ? formatNumber(mateDistance) : '—'}</div>
+  `;
+
+  hud.style.display = 'block';
+}
+
+function formatNumber(value: any): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '—';
+}
+
+function formatSeconds(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  return `${minutes}m ${seconds}s`;
 }

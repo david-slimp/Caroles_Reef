@@ -22,7 +22,7 @@ export function createRenderer(deps: {
     await drawBackground(ctx, W, H, themeRef.value);
     drawDecor();
     drawPellets(ctx);
-    fish.forEach((f) => drawFish(f));
+    fish.forEach((f) => drawFish(f, ctx));
     bubbles.draw();
   }
 

@@ -1,4 +1,5 @@
 import { storageManager } from './localStorageManager';
+import gameDataValidator from './gameDataValidator';
 import { getSavedFish } from './fishStorage';
 import { fishManager } from '../creatures/FishManager';
 import { gameState } from '../state/GameState';
@@ -42,47 +43,18 @@ class BackupManager {
     }
 
     const result: FishData[] = [];
-    
-    for (const fish of fishCollection) {
-      if (!fish || typeof fish !== 'object') {
+
+    fishCollection.forEach((fish) => {
+      const validated = gameDataValidator.validateAndTransformFishCollectionItem(
+        fish,
+        Math.floor(Date.now() / 1000)
+      );
+      if (validated) {
+        result.push(validated as FishData);
+      } else {
         console.warn('Invalid fish data found in collection, skipping');
-        continue;
       }
-      // Ensure required fields exist
-      if (!fish || typeof fish !== 'object') {
-        console.warn('Invalid fish data found in collection, skipping');
-        return null;
-      }
-
-      // Ensure fish has required properties
-      const fishObj = fish as Record<string, any>;
-      const fishDataObj = (fishObj.fishData && typeof fishObj.fishData === 'object') 
-        ? { ...fishObj.fishData } 
-        : {};
-      
-      // Create validated fish with required properties
-      const validatedFish: FishData = {
-        id: typeof fishObj.id === 'string' ? fishObj.id : `fish_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: typeof fishObj.name === 'string' ? fishObj.name : 'Unnamed Fish',
-        timestamp: typeof fishObj.timestamp === 'number' ? fishObj.timestamp : Date.now(),
-        fishData: {
-          id: typeof fishDataObj.id === 'string' ? fishDataObj.id : '',
-          name: typeof fishDataObj.name === 'string' ? fishDataObj.name : '',
-          species: typeof fishDataObj.species === 'string' ? fishDataObj.species : 'unknown',
-          ...fishDataObj
-        }
-      };
-
-      // Copy additional properties if they exist
-      const additionalProps = ['saveDate', 'rarity', 'generation', 'thumbnail'] as const;
-      additionalProps.forEach(prop => {
-        if (prop in fishObj) {
-          validatedFish[prop] = fishObj[prop];
-        }
-      });
-
-      result.push(validatedFish);
-    }
+    });
 
     return result.length > 0 ? result : null;
   }
@@ -106,13 +78,16 @@ class BackupManager {
 
       // Get the current in-memory bio (fish) Inventory
       const bioInventory = fishManager.getSavedFish();
+      const normalizedCollection = this.validateFishCollection(currentGameState.fishCollection || bioInventory) || [];
+      const normalizedBioInventory = this.validateFishCollection(bioInventory) || [];
 
       // Create backup object with game state and bio (fish) Inventory
       const backupData = {
         ...currentGameState,
         // Ensure we don't include any functions or circular references
         fish: [], // Fish are handled separately in fishCollection
-        bioInventory: bioInventory.map(fish => ({
+        fishCollection: normalizedCollection,
+        bioInventory: normalizedBioInventory.map(fish => ({
           ...fish,
           // Ensure fish data is serializable
           fishData: {
@@ -255,6 +230,13 @@ class BackupManager {
       
       if (!saveSuccess) {
         throw new Error('Failed to save validated backup data to storage');
+      }
+
+      // Sync GameState with restored data so UI reflects the backup immediately
+      try {
+        gameState.load(updatedData as any);
+      } catch (error) {
+        console.error('Failed to sync GameState after backup restore:', error);
       }
       
       // Update the global state without triggering a page reload

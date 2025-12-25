@@ -1,7 +1,7 @@
 // /src/utils/fishStorage.ts
 
 import { v4 as uuidv4 } from 'uuid';
-import { storageManager } from './localStorageManager';
+import { gameState } from '../state/GameState';
 
 /**
  * Define the structure of a saved fish.
@@ -54,9 +54,8 @@ interface StoredFish {
  */
 export function saveFish(fishData: any, name: string = ''): SavedFish | null {
   try {
-    // Get current data
-    const currentData = storageManager.getCurrentData() as any; // Cast to any to bypass readonly
-    const fishCollection = currentData.fishCollection || [];
+    const currentState = gameState.getState();
+    const fishCollection = currentState.fishCollection || [];
     
     // Create a new saved fish object
     const now = Date.now();
@@ -78,9 +77,7 @@ export function saveFish(fishData: any, name: string = ''): SavedFish | null {
       timestamp: savedFishItem.timestamp || Date.now()
     }];
     
-    // Update the in-memory data without persisting
-    // Persistence to storage will be handled by the storage manager's save cycle
-    currentData.fishCollection = updatedCollection;
+    gameState.updateState({ fishCollection: updatedCollection });
     
     return savedFishItem;
   } catch (error) {
@@ -97,8 +94,7 @@ export function saveFish(fishData: any, name: string = ''): SavedFish | null {
  */
 export function getSavedFish(): SavedFish[] {
   try {
-    const currentData = storageManager.getCurrentData();
-    const collection = (currentData.fishCollection || []) as StoredFish[];
+    const collection = (gameState.getState().fishCollection || []) as StoredFish[];
 
     // Convert stored fish format to SavedFish format
     return collection.map(fish => {
@@ -135,11 +131,9 @@ export function getSavedFish(): SavedFish[] {
  */
 export function removeSavedFish(fishId: string): boolean {
   try {
-    const currentData = storageManager.getCurrentData() as any; // Cast to any to bypass readonly
-    const updatedCollection = (currentData.fishCollection || []).filter((fish: { id: string }) => fish.id !== fishId);
-    // Update the in-memory data without persisting
-    // Persistence to storage will be handled by the storage manager's save cycle
-    currentData.fishCollection = updatedCollection;
+    const currentState = gameState.getState();
+    const updatedCollection = (currentState.fishCollection || []).filter((fish: { id: string }) => fish.id !== fishId);
+    gameState.updateState({ fishCollection: updatedCollection });
     
     return true;
   } catch (error) {
@@ -155,10 +149,7 @@ export function removeSavedFish(fishId: string): boolean {
  */
 export function clearAllSavedFish(): void {
   try {
-    const currentData = storageManager.getCurrentData() as any; // Cast to any to bypass readonly
-    // Clear the in-memory data without persisting
-    // Persistence to storage will be handled by the storage manager's save cycle
-    currentData.fishCollection = [];
+    gameState.updateState({ fishCollection: [] });
   } catch (error) {
     console.error('Error clearing saved fish:', error);
   }

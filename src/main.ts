@@ -1,5 +1,6 @@
 // src/main.ts
 import { AudioManager } from './audio/audioManager';
+import { GAME_CONFIG } from './config/gameConfig';
 import { EventBus } from './core/events';
 import { runLegacyGame } from './legacy/runLegacyGame';
 import { gameState } from './state/GameState';
@@ -8,6 +9,11 @@ import { storageManager } from './utils/localStorageManager';
 // Initialize core systems
 const bus = new EventBus();
 const _audio = new AudioManager(bus);
+
+const titleEl = document.getElementById('gameTitle');
+if (titleEl) {
+  titleEl.textContent = `${GAME_CONFIG.title} — ${GAME_CONFIG.version}`;
+}
 
 // Load saved data and initialize game state
 try {

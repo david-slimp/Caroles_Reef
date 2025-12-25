@@ -34,6 +34,11 @@ export class GameStateManager {
   private static instance: GameStateManager;
   private state: GameState;
   private subscribers: Array<(state: GameState) => void> = [];
+  private isDirty = false;
+  private isSaving = false;
+  private lastSaveAt = 0;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly saveIntervalMs = 60000;
 
   private constructor() {
     // Initialize with default state that matches the GameState interface
@@ -126,6 +131,7 @@ export class GameStateManager {
       
       // Update the state reference
       this.state = nextState;
+      this.markDirty();
       
       // Notify subscribers
       this.notifySubscribers();
@@ -172,6 +178,10 @@ export class GameStateManager {
   // Persistence methods
   async save(): Promise<void> {
     try {
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer);
+        this.saveTimer = null;
+      }
       const { storageManager } = await import('../utils/localStorageManager');
       
       // Convert to GameSaveData format
@@ -183,9 +193,41 @@ export class GameStateManager {
       };
       
       storageManager.save(saveData);
+      this.lastSaveAt = Date.now();
+      this.isDirty = false;
     } catch (error) {
       console.error('Failed to save game state:', error);
       throw error;
+    }
+  }
+
+  private markDirty(): void {
+    this.isDirty = true;
+    this.scheduleSave();
+  }
+
+  private scheduleSave(): void {
+    if (this.saveTimer || this.isSaving) return;
+    const elapsed = Date.now() - this.lastSaveAt;
+    const delay = Math.max(0, this.saveIntervalMs - elapsed);
+    this.saveTimer = setTimeout(() => {
+      this.flushSave();
+    }, delay);
+  }
+
+  private async flushSave(): Promise<void> {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (!this.isDirty || this.isSaving) return;
+    this.isSaving = true;
+    try {
+      await this.save();
+    } catch (error) {
+      console.error('Failed to flush scheduled save:', error);
+    } finally {
+      this.isSaving = false;
     }
   }
 
