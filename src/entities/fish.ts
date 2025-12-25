@@ -1,25 +1,82 @@
 // src/entities/fish.ts
 // @ts-nocheck
 import { playSound, Sounds } from '../utils/audio';
+import { gameState } from '../state/GameState';
+import { toast } from '../ui/toast';
 
-// Sound effect for new fish births
+// Sound effect for new fish births and death
 const YIPPIE_SOUND = 'yippie.ogg';
+const DEATH_SOUND = 'dead.mp3';
 
-type Env = {
+// Global state for fish module
+let ctx: CanvasRenderingContext2D;
+let viewportSize: { W: number; H: number } = { W: 0, H: 0 };
+let pellets: any[] = [];
+let decors: any[] = [];
+let fish: any[] = [];
+let discovered: Set<string> = new Set();
+let onIncGeneration: (() => void) | null = null;
+let maxFish = 60;
+
+/**
+ * Configure fish module with required dependencies
+ * @param config - Configuration object containing dependencies
+ */
+export function configureFish(config: {
   getSize: () => { W: number; H: number };
   ctx: CanvasRenderingContext2D;
   pellets: any[];
   decors: any[];
   fish: any[];
   discovered: Set<string>;
-  toast: (msg: string) => void;
+  toast: (msg: string, isError?: boolean) => void;
   incGeneration: () => void;
   maxFish: number;
-};
+}) {
+  ctx = config.ctx;
+  viewportSize = config.getSize();
+  pellets = config.pellets;
+  decors = config.decors;
+  fish = config.fish;
+  discovered = config.discovered;
+  onIncGeneration = config.incGeneration;
+  maxFish = config.maxFish;
+}
 
-let env: Env;
+/**
+ * Adds a fish to the active tank and syncs GameState tracking.
+ */
+export function hasFishInTank(targetId: string): boolean {
+  return fish.some((f) => f.id === targetId || f.originalId === targetId);
+}
 
-export function configureFish(e: Env) { env = e; }
+export function updateFishNameInTank(targetId: string, newName: string): boolean {
+  const tankFish = fish.find((f) => f.id === targetId || f.originalId === targetId);
+  if (!tankFish) {
+    return false;
+  }
+  tankFish.name = newName;
+  return true;
+}
+
+export function addFishToTank(newFish: any): void {
+  const targetIds = [newFish.id, newFish.originalId].filter(Boolean);
+  if (targetIds.some((id) => hasFishInTank(id))) {
+    return;
+  }
+
+  fish.push(newFish);
+  const currentState = gameState.getState();
+  const fishInTank = [...(currentState.fishInTank || [])];
+  const fishInTankOriginalIds = [...(currentState.fishInTankOriginalIds || [])];
+  if (!fishInTank.includes(newFish.id)) {
+    fishInTank.push(newFish.id);
+  }
+  if (newFish.originalId && !fishInTankOriginalIds.includes(newFish.originalId)) {
+    fishInTankOriginalIds.push(newFish.originalId);
+  }
+  gameState.updateState({ fishInTank, fishInTankOriginalIds });
+}
 
 /* ---------------- utils ---------------- */
 const rand  = (a, b) => Math.random() * (b - a) + a;
@@ -52,11 +109,12 @@ function killFish(f:any){
   f.state = 'dead';
   f._mateId = null;
   f._ritualTimer = 0;
-  f._breedCd = Number.POSITIVE_INFINITY; // block mating forever
+  f.canMate = false; // block mating forever
   f._bites = f._bites || [];
   f._corpseArea = estimateCorpseArea(f); // used for despawn when eaten
   f.vx = 0;
-  f.vy = -20; // gentle float up (~half slow pellet speed)
+  f.vy = -20; // gentle float up (~half slow pellet speed)ffffff
+  playSound(DEATH_SOUND, { volume: 0.5 });
 }
 
 /* ---------------- legacy-ish data ---------------- */
@@ -111,12 +169,41 @@ function inheritBirthSize(a:number,b:number){ return mutateSizeGene(inheritNum(a
 function inheritMaxSize(a:number,b:number){ return mutateSizeGene(inheritNum(a,b), SIZE_GENE.MAX_MIN, SIZE_GENE.MAX_MAX); }
 
 /* ---------------- environment helpers ---------------- */
-function nearDecorType(x,y,type,rad){
-  return env.decors.some(d => d.type===type && Math.hypot(d.x-x, d.y-y) <= (rad || d.r));
+function nearDecorType(x: number, y: number, type: string, rad?: number): boolean {
+  const decor = gameState.getState().tank?.decorations || [];
+  return decor.some(d => d.type === type && Math.hypot(d.x - x, d.y - y) <= (rad || d.r));
 }
-function removeFish(id){
-  const idx = env.fish.findIndex(f=>f.id===id);
-  if(idx>=0) env.fish.splice(idx,1);
+/**
+ * Removes a fish from the in-memory tank state
+ * @param id - The ID of the fish to remove from the tank
+ */
+async function removeFish(id: string): Promise<void> {
+  try {
+    const fishIndexInTank = fish.findIndex((f) => f.id === id);
+    const fishToRemove = fishIndexInTank >= 0 ? fish[fishIndexInTank] : undefined;
+    if (fishIndexInTank >= 0) {
+      fish.splice(fishIndexInTank, 1);
+    }
+    // Get current state and update fish in tank
+    const currentState = gameState.getState();
+    const fishInTank = [...(currentState.fishInTank || [])];
+    const fishInTankOriginalIds = [...(currentState.fishInTankOriginalIds || [])];
+    const originalId = fishToRemove?.originalId;
+    const fishIndex = fishInTank.findIndex(fishId => fishId === id);
+    
+    if (fishIndex >= 0) {
+      fishInTank.splice(fishIndex, 1);
+      if (originalId) {
+        const originalIndex = fishInTankOriginalIds.findIndex((savedId) => savedId === originalId);
+        if (originalIndex >= 0) {
+          fishInTankOriginalIds.splice(originalIndex, 1);
+        }
+      }
+      await gameState.updateState({ fishInTank, fishInTankOriginalIds });
+    }
+  } catch (error) {
+    console.error('Error removing fish from tank:', error);
+  }
 }
 
 /* ---------------- corpse bites ---------------- */
@@ -127,7 +214,7 @@ const CORPSE = {
 
 /* ---------------- public API ---------------- */
 export function makeFish(opts = {}){
-  const { W, H } = env.getSize();
+  const { W, H } = viewportSize;
   const id = uuid();
 
   const birthSizeGene = 2;
@@ -136,6 +223,7 @@ export function makeFish(opts = {}){
 
   const base:any = {
     id, name: '',
+    _eatCd: 0,  // Eating cooldown timer (in seconds)
     x: rand(40, W-40), y: rand(40, H-40),
     vx: rand(-30,30), vy: rand(-30,30),
     dir: rand(0, Math.PI*2),
@@ -144,13 +232,13 @@ export function makeFish(opts = {}){
     maxSize:   maxSizeGene,
     size: undefined, // set below
 
+    birthTime: Math.floor(Date.now() / 1000),  // seconds since epoch 1970-01-01T00:00:00Z
     age: 0,
     sex: chance(0.5)? 'F':'M',
 
     constitution,
     speed: randi(2,8),
-    // Sense is stored as a gene value 0-9, actual radius is gene × 20 (0-180)
-    senseRadius: randi(0,10),
+    senseGene: randi(0,9),
     hungerDrive: randi(2,8),
     rarityGene: randi(0,9),
     colorHue: randi(0,360),
@@ -161,6 +249,7 @@ export function makeFish(opts = {}){
     parents: opts.parents || null,
     shiny: false,
     favorite: opts.initialFish || false,
+    canMate: true, // All new fish can mate by default
     state: 'wander',
     drag: false,
 
@@ -191,6 +280,7 @@ export function makeFish(opts = {}){
   };
 
   base.size = (opts.size ?? base.birthSize);
+  base.senseRadius = base.senseGene * 20;
   base.shiny = maybeShiny(base.rarityGene);
   if(opts.override) Object.assign(base, opts.override);
 
@@ -205,13 +295,10 @@ export function makeFish(opts = {}){
 
 /* ---------- spawn near mom's tail ---------- */
 function tailSpawnPosition(mom){
-  const { W, H } = env.getSize();
+  console.log(`FIXME: tailSpawnPosition mom:`, mom);
+  const { W, H } = viewportSize;
   const bodyLen = clamp(mom.size * 2.2, 16, 140);
-  const tailL =
-    mom.finShape==='long'   ? bodyLen*0.45 :
-    mom.finShape==='fan'    ? bodyLen*0.35 :
-    mom.finShape==='pointy' ? bodyLen*0.40 :
-                              bodyLen*0.30;
+  const tailL = bodyLen*0.40;
   const localTailX = -bodyLen * 0.5 - tailL * 0.75;
   const cos = Math.cos(mom.dir), sin = Math.sin(mom.dir);
   let sx = mom.x + localTailX * cos;
@@ -222,6 +309,7 @@ function tailSpawnPosition(mom){
 }
 
 export function breed(a, b) {
+   
   const mom = a.sex === 'F' ? a : b;
   const babies = [];
   const spawn = tailSpawnPosition(mom);
@@ -232,7 +320,7 @@ export function breed(a, b) {
   for (let i = 0; i < 3; i++) {
     // inherit existing genes with rarity-based mutation chance
     const speed        = mutateNum(inheritNum(a.speed, b.speed), mutationChance);
-    const senseRadius  = mutateNum(inheritNum(a.senseRadius, b.senseRadius), mutationChance);
+    const senseGene    = mutateNum(inheritNum(a.senseGene ?? 5, b.senseGene ?? 5), mutationChance);
     const hungerDrive  = mutateNum(inheritNum(a.hungerDrive, b.hungerDrive), mutationChance);
     const rarityGene   = mutateNum(inheritNum(a.rarityGene, b.rarityGene), mutationChance);
     const colorHue     = mutateHue(inheritNum(a.colorHue, b.colorHue), mutationChance);
@@ -257,10 +345,11 @@ export function breed(a, b) {
       parents: { ma: a.id, pa: b.id },
       initialFish: false,
       override: {
-        speed, senseRadius, hungerDrive, rarityGene,
+        speed, senseGene, hungerDrive, rarityGene,
         colorHue, patternType, finShape, eyeType,
         constitution, birthSize, maxSize,
 
+        name: 'Unnamed',
         x: spawn.x, y: spawn.y,
         vx: 0, vy: 0,
         dir: awayAngle,
@@ -273,9 +362,11 @@ export function breed(a, b) {
       },
     });
 
+    // If mom is near (within 90px) coral, give baby a chance to be shiny
     if (nearDecorType((a.x + b.x) / 2, (a.y + b.y) / 2, 'coral', 90)) {
       if (chance(0.1)) f.shiny = true;
     }
+    console.log(`FIXME: About to babies.push(f):`, f);
     babies.push(f);
     
     // Play yippie sound for the first baby only, at half volume
@@ -284,21 +375,44 @@ export function breed(a, b) {
     }
   }
 
-  env.toast('New fry hatched! (+3)');
-  env.incGeneration();
+  toast('New fry hatched! (+3)');
+  // Update generation in game state
+  const currentState = gameState.getState();
+  const currentGen = currentState.progress.generation || 1;
+  gameState.updateState({
+    ...currentState,
+    progress: {
+      ...currentState.progress,
+      generation: currentGen + 1
+    }
+  });
   return babies;
 }
 
-export function trackDiscovery(f){ const key = `${f.patternType}-${f.finShape}`; if(!env.discovered.has(key)) env.discovered.add(key); }
+export function trackDiscovery(f) { 
+  const key = `${f.patternType}-${f.finShape}`; 
+  const currentState = gameState.getState();
+  const discovered = new Set(currentState.progress.discovered || []);
+  if (!discovered.has(key)) {
+    discovered.add(key);
+    gameState.updateState({
+      ...currentState,
+      progress: {
+        ...currentState.progress,
+        discovered: Array.from(discovered)
+      }
+    });
+  }
+}
 
 // Adult = ready to breed: age AND size thresholds
 export function isAdult(f){ return f.age >= BREED.MIN_AGE_SEC && f.size >= f.maxSize * BREED.MIN_SIZE_FRAC; }
 export function isYoung(f){ return f.age < BREED.MIN_AGE_SEC; }
 
-export function pickFish(x,y){
-  for(let i=env.fish.length-1;i>=0;i--){
-    const f = env.fish[i];
-    if(Math.hypot(f.x-x, f.y-y) < Math.max(16, f.size)) return f;
+export function pickFish(x: number, y: number) {
+  for (let i = fish.length - 1; i >= 0; i--) {
+    const f = fish[i];
+    if (Math.hypot(f.x - x, f.y - y) < Math.max(16, f.size)) return f;
   }
   return null;
 }
@@ -390,29 +504,22 @@ async function updateFishInCollection(updatedFish) {
           ...updatedFish,                   // Override with updated properties
           id: savedFish[fishIndex].fishData.id, // Preserve original ID
           originalId: savedFish[fishIndex].fishData.originalId, // Preserve originalId
-          lastFed: updatedFish.lastFed || savedFish[fishIndex].fishData.lastFed,
           lastGrew: isGrowing ? now : (savedFish[fishIndex].fishData.lastGrew || now),
           lastUpdated: now
         }
       };
       
-      // Check if there are actual changes to save
+      // Check if there are actual changes
       const hasChanges = JSON.stringify(savedFish[fishIndex]) !== JSON.stringify(updatedData);
       
       if (hasChanges) {
-        // Update in the saved fish array
+        // Update the in-memory fish collection
         savedFish[fishIndex] = updatedData;
+        gameState.updateState({ fishCollection: savedFish });
         
-        try {
-          // Save back to localStorage
-          localStorage.setItem('caroles_reef_saved_fish', JSON.stringify(savedFish));
-          
-          // Force refresh the collection view if it's open
-          if (fishCollection.isVisible()) {
-            // FIXME: fishCollection.refreshCollection();
-          }
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
+        // Force refresh the collection view if it's open
+        if (fishCollection.isVisible()) {
+          // FIXME: fishCollection.refreshCollection();
         }
       }
     }
@@ -422,8 +529,13 @@ async function updateFishInCollection(updatedFish) {
 }
 
 export async function updateFish(f, dt){
-  const { W, H } = env.getSize();
-  const pellets = env.pellets;
+  const { W, H } = viewportSize;
+  // const pellets = gameState.getState().pellets;  // TODO: Re-enable when pellets are properly managed
+  
+  // Update eating cooldown timer
+  if (f._eatCd > 0) {
+    f._eatCd = Math.max(0, f._eatCd - dt);
+  }
   
   // Store previous size to detect changes
   const prevSize = f.size;
@@ -450,7 +562,8 @@ export async function updateFish(f, dt){
   if (isCorpse(f)) {
     f.y += (-LIFE.RISE_SPEED) * dt;
     if ((f._corpseArea !== undefined && f._corpseArea <= 0) || f.y < LIFE.OFF_Y) {
-      removeFish(f.id);
+      // Fire and forget - we don't need to await this
+      removeFish(f.id).catch(console.error);
       return;
     }
     if (f._breedCd > 0) f._breedCd -= dt;
@@ -552,7 +665,8 @@ export async function updateFish(f, dt){
     target = { x: f.x + (ax/alen)*200, y: f.y + (ay/alen)*200 };
   } else  // Handle ritual state and timer
   if (f._mateId && f.state === 'ritual') {
-    const partner = env.fish.find(m => m.id === f._mateId);
+    const tankFish = fish;
+    const partner = tankFish.find((m: any) => m.id === f._mateId);
     
     // Clean up if partner is gone, dead, or no longer paired with us
     if (!partner || partner.dead || partner._mateId !== f.id) {
@@ -598,16 +712,18 @@ export async function updateFish(f, dt){
   }
 
   if (!target) {
-    // consider pellets and corpses as food
+    // consider pellets and corpses as food - but only if not on eating cooldown
     let bestFood = null, bestFoodDist = Infinity;
-    const senseRadius = f.senseRadius * 20; // Convert gene to pixels (0-180)
-    const eff = senseRadius * (0.9 + 0.7 * (f.hungerDrive/9));
+    const senseRadius = f.senseGene * 20; // Convert gene to pixels (0-180)
+    // const eff = f.senseGene * (0.9 + 0.7 * (f.hungerDrive/9));
+    const eff = f._eatCd <= 0 ? f.senseGene * (f.hungerDrive * 2.1) + 5 : 0; // Set effective range to 0 if on cooldown
     for (const p of pellets) {
       const d = Math.hypot(p.x - f.x, p.y - f.y);
       if (d < eff && d < bestFoodDist) { bestFood = p; bestFoodDist = d; }
     }
     let bestCorpse = null, bestCorpseDist = Infinity;
-    for (const c of env.fish) {
+    const tankFish = fish;
+    for (const c of tankFish) {
       if (c === f) continue;
       if (!c.dead) continue;
       if (c._corpseArea !== undefined && c._corpseArea <= 0) continue;
@@ -619,34 +735,41 @@ export async function updateFish(f, dt){
     else if (bestCorpse) foodTarget = bestCorpse;
 
     // mate desire (exclude dead, only adults, no cooldown, not already in ritual)
-    let bestMate = null, bestMateDist = Infinity;
-    if (isAdult(f) && f._breedCd <= 0 && !f._mateId) {
-      for (const m of env.fish) {
-        if (m===f) continue;
+    let bestMate = null, bestMateDist = f.senseGene * 20;
+    const MAX_FISH_BASE = 60;
+    const canSeekMate = tankFish.length < MAX_FISH_BASE;
+    if (canSeekMate && isAdult(f) && f._breedCd <= 0 && !f._mateId && f._eatCd <= 0 && f.canMate !== false) {
+      for (const m of tankFish) {
+        if (m === f) continue;
         if (!isAdult(m)) continue;
-        if (m.sex===f.sex) continue;
         if (m._breedCd > 0) continue;
         if (m._mateId) continue;
         if (m.dead) continue;
-        const d = Math.hypot(m.x-f.x, m.y-f.y);
-        const senseRadius = f.senseRadius * 20; // Convert gene to pixels (0-180)
+        if (m.canMate === false) continue;
+        const d = Math.hypot(m.x - f.x, m.y - f.y);
+        const senseRadius = f.senseGene * 20; // Convert gene to pixels (0-180)
         if (d < senseRadius && d < bestMateDist) { bestMate = m; bestMateDist = d; }
       }
     }
 
-    if (bestMate && (!foodTarget || bestMateDist < (foodTarget===bestFood?bestFoodDist:bestCorpseDist) * 0.8 || Math.random() < 0.3)) {
-      f.state = 'seekMate'; target = bestMate;
-    } else if (foodTarget) {
-      f.state = 'seekFood'; target = foodTarget;
+    if (f._eatCd <= 0) {
+      if (bestMate && (!foodTarget || bestMateDist < (foodTarget===bestFood?bestFoodDist:bestCorpseDist) * 0.8 || Math.random() < 0.3)) {
+        f.state = 'seekMate'; target = bestMate;
+      } else if (foodTarget) {
+        f.state = 'seekFood'; target = foodTarget;
+      } else {
+        f.state = 'wander';
+      }
     } else {
+      // If on eating cooldown, just wander
       f.state = 'wander';
     }
   }
 
   // decor influences
   let speedBoost = 1;
-  if(nearDecorType(f.x,f.y,'plant',60)) speedBoost += 0.1;
-  if(nearDecorType(f.x,f.y,'rock',60) && !isAdult(f)) speedBoost -= 0.1;
+  if(nearDecorType(f.x,f.y,'plant',60)) speedBoost += 0.2;
+  if(nearDecorType(f.x,f.y,'rock',60) && !isAdult(f)) speedBoost -= 0.2;
 
   // movement (state-aware + snappy turns near food)
   const stateMult =
@@ -736,26 +859,29 @@ export async function updateFish(f, dt){
   f.dir = Math.atan2(f.vy, f.vx);
 
   // eat pellets (skip during ritual/flee)
-  if (f.state !== 'ritual' && f.state !== 'flee') {
+  if (f.state !== 'ritual' && f.state !== 'flee' && f._eatCd <= 0) {
     for(let i=pellets.length-1;i>=0;i--){
       const p = pellets[i];
       if(Math.hypot(p.x-f.x,p.y-f.y) < Math.max(12,f.size*0.85)){
         const newSize = Math.min(f.size + 2, f.maxSize);
         if (newSize > f.size) {
-          updateFishProperties(f, {
-            size: newSize,
-            lastFed: new Date().toISOString()
-          });
+          f.size = newSize;
+          f.health = Math.min(100, f.health + 10); // Restore some health when eating
         }
+        
+        // Update hunger drive (inverse of hunger drive - higher drive means less cooldown)
+        // Clamping hungerDrive between 0-9 to ensure cooldown is at least 1 second
+        f._eatCd = Math.max(1, 10 - Math.min(9, Math.max(0, f.hungerDrive || 0)));
         
         pellets.splice(i,1);
       }
     }
   }
 
-  // nibble corpses (skip during ritual/flee)
-  if (f.state !== 'ritual' && f.state !== 'flee') {
-    for (const c of env.fish) {
+  // nibble corpses (skip during ritual/flee and if on cooldown)
+  if (f.state !== 'ritual' && f.state !== 'flee' && f._eatCd <= 0) {
+    const tankFish = fish;
+    for (const c of tankFish) {
       if (c === f) continue;
       if (!c.dead) continue;
       if (c._corpseArea !== undefined && c._corpseArea <= 0) continue;
@@ -788,11 +914,15 @@ export async function updateFish(f, dt){
           updateFishProperties(f, {
             size: newSize
           });
+          
+          // Set cooldown based on hungerDrive (10 - hungerDrive seconds)
+          // Clamping hungerDrive between 0-9 to ensure cooldown is at least 1 second
+          f._eatCd = Math.max(1, 10 - Math.min(9, Math.max(0, f.hungerDrive || 0)));
         }
 
         // flee away
         f._fleeFromX = c.x; f._fleeFromY = c.y;
-        f._fleeDistLeft = (f.senseRadius * 20) / 2; // Convert gene to pixels
+        f._fleeDistLeft = (f.senseGene  * 20) / 2; // Convert gene to pixels
         break;
       }
     }
@@ -810,7 +940,8 @@ export async function updateFish(f, dt){
 
   // Debug logging for breeding state (only log occasionally to reduce noise)
   if (f._mateId && Math.random() < 0.01) { // ~1% chance to log each frame
-    const partner = env.fish.find(m => m.id === f._mateId);
+    const tankFish = fish;
+    const partner = tankFish.find((m: any) => m.id === f._mateId);
     const distance = partner ? Math.hypot(partner.x - f.x, partner.y - f.y) : 0;
     console.log(`Fish ${f.id} (${f.sex}) state: ${f.state}, ` +
                 `timer: ${f._ritualTimer?.toFixed(2)}, ` +
@@ -822,28 +953,31 @@ export async function updateFish(f, dt){
 
   // ritual completion → spawn once + cooldown (then honor pending death)
   if (f.state === 'ritual' && f._mateId && f._ritualTimer <= 0) {
-    const partner = env.fish.find(m => m.id === f._mateId);
+    const tankFish = fish;
+    const partner = tankFish.find((m: any) => m.id === f._mateId);
     
     // Only proceed if we have a valid partner and they're still paired with us
     if (partner && partner._mateId === f.id) {
-      // Only one fish should handle the breeding (use consistent ordering)
-      console.log(`Attempting to breed fish ${f.id} with ${partner.id}`);
-      if (f.id < partner.id) {
-        try {
-          const babies = breed(f, partner);
-          for(const nb of babies) { 
-            if(env.fish.length < env.maxFish) env.fish.push(nb);
-          }
-          // Set cooldown for both parents
-          // 60 second cooldown after successful breeding
-          f._breedCd = 60;
-          partner._breedCd = 60;
-          
-          // Play breeding sound
-          playSound(Sounds.breed);
-        } catch (e) {
-          console.error('Error during breeding:', e);
+      // If this is the male, switch to evaluating the female
+      if (f.sex === 'male') {
+        return; // Let the female handle the breeding logic
+      }
+      
+      console.log(`Attempting to breed fish ${f.id} (female) with ${partner.id} (male)`);
+      // At this point we know f is female
+      try {
+        const babies = breed(f, partner);
+        const tankFish = fish;
+        for(const nb of babies) {
+          tankFish.push(nb);
         }
+        // Set cooldown for both parents
+        // 60 second cooldown after successful breeding
+        f._breedCd = 60;
+        partner._breedCd = 60;
+        
+      } catch (e) {
+        console.error('Error during breeding:', e);
       }
       
       // Clean up both fish states
@@ -871,13 +1005,20 @@ export async function updateFish(f, dt){
 
 /* ---------------- start ritual (proximity) ---------------- */
 export function handleBreeding(_dt){
-  for(let i=0;i<env.fish.length;i++){
-    const a = env.fish[i];
-    if (!isAdult(a) || a.dead || a.state === 'ritual') continue;
+  // Skip mating if tank is at or over capacity
+  const tankFish = fish;
+  const MAX_FISH_BASE = 60; // From legacy runLegacyGame.ts
+  if (tankFish.length >= MAX_FISH_BASE) return;
 
-    for(let j=i+1;j<env.fish.length;j++){
-      const b = env.fish[j];
-      if (!isAdult(b) || b.dead || b.state === 'ritual') continue;
+  for(let i=0;i<tankFish.length;i++){
+    const a = tankFish[i];
+    // Skip if fish can't mate, isn't an adult, is dead, or already in a ritual
+    if (!a.canMate || !isAdult(a) || a.dead || a.state === 'ritual') continue;
+
+    for(let j=i+1;j<tankFish.length;j++){
+      const b = tankFish[j];
+      // Skip if fish can't mate, isn't an adult, is dead, or already in a ritual
+      if (!b.canMate || !isAdult(b) || b.dead || b.state === 'ritual') continue;
       if (a.sex === b.sex) continue;
 
       // Check breeding cooldown and existing mates
@@ -885,7 +1026,7 @@ export function handleBreeding(_dt){
       if (a._mateId || b._mateId) continue;
 
       // Check distance between fish (using their sensing radius)
-      const senseRadius = (a.senseRadius + b.senseRadius) * 15; // Average sensing radius
+      const senseRadius = (a.senseGene + b.senseGene) * 15; // Average sensing radius
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       
       if (d < senseRadius * 0.8) { // Need to be within 80% of sensing range
@@ -974,9 +1115,9 @@ function drawDeadFishWithHoles(ctx:CanvasRenderingContext2D, f:any){
   ctx.restore();
 }
 
-export function drawFish(f:any){
-  const ctx = env.ctx;
+export function drawFish(f: any, ctx: CanvasRenderingContext2D) {
 
+  // Draw green circle around selected fish
   if (f.selected) {
     ctx.save();
     ctx.beginPath();
@@ -985,16 +1126,18 @@ export function drawFish(f:any){
     ctx.lineWidth = 3;
     ctx.stroke();
 
+    // Draw sense radius
     if (!f.dead) {
       ctx.globalAlpha = 0.5;
       ctx.beginPath();
-      const senseRadius = f.senseRadius * 20; // Convert gene to pixels (0-180)
+      const senseRadius = f.senseGene  * 20; // Convert gene to pixels (0-180)
       ctx.arc(f.x, f.y, senseRadius, 0, Math.PI * 2);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      const eff = senseRadius * (0.9 + 0.7 * (f.hungerDrive / 9));
+      // Draw hunger radius
+      const eff = f.senseGene * (f.hungerDrive * 2.1) + 5;
       ctx.setLineDash([8, 6]);
       ctx.globalAlpha = 0.35;
       ctx.beginPath();
@@ -1241,7 +1384,7 @@ function drawBetterTail(
   ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bodyLen*0.5-2, 0, 2, 0.2, -0.2); ctx.stroke();
 
   // name label
-  if(f.name){
+  if(f.name && f.name !== 'Unnamed'){
     ctx.save();
     ctx.rotate(-f.dir);
     const fontPx = Math.max(10, Math.floor(f.size*0.45));

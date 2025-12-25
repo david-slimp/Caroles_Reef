@@ -39,9 +39,9 @@ export async function drawBackground(
   const spec = THEMES[key] ?? THEMES.day; // fallback so we never crash
 
   // Handle custom image background if specified in the theme (preferred)
-  if (spec.background) {
+  if ('background' in spec && spec.background) {
     const bgConfig = BACKGROUNDS[spec.background as BackgroundId];
-    if (bgConfig?.type === 'custom-image' && bgConfig.imageUrl) {
+    if (bgConfig && 'type' in bgConfig && bgConfig.type === 'custom-image' && 'imageUrl' in bgConfig && bgConfig.imageUrl) {
       try {
         const img = await loadImage(bgConfig.imageUrl);
         // Clear the canvas and draw the image

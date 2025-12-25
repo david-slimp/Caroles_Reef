@@ -3,6 +3,8 @@
 // It holds no game state; callers pass the selected fish and callbacks.
 // Strict, framework-free DOM code.
 
+import type { CreatureBase } from '../creatures/types';
+
 export type Sex = 'M' | 'F';
 
 export type TailShape = 'pointy' | 'round' | 'fan' | 'forked' | 'lunate';
@@ -26,7 +28,7 @@ export interface ParentsRef {
   pa?: string;
 }
 
-export interface FishData {
+export interface FishData extends Omit<CreatureBase, 'speciesId' | 'birthSize' | 'energy' | 'health' | 'direction' | 'generation' | 'parents'> {
   id: string;
   name?: string;
   species?: string;
@@ -46,7 +48,7 @@ export interface FishData {
   size: number;
   maxSize: number;
   speed?: number;
-  senseRadius?: number;
+  senseGene?: number;
   hungerDrive?: number;
   energy?: number;
   health?: number;
@@ -57,7 +59,7 @@ export interface FishData {
   shiny?: boolean;
 
   // Lifecycle
-  age?: number; // seconds
+  age: number; // seconds
   sex: Sex;
   favorite?: boolean;
   dead?: boolean;
@@ -202,8 +204,7 @@ export class FishCard {
     // Stage
     const stageEl = by('#fc-stage');
     if (stageEl) {
-      const ageSec = f.age ?? 0;
-      const stage = f.dead ? 'Dead' : ageSec < 30 ? 'Juvenile' : ageSec < 60 ? 'Adult' : 'Elder';
+      const stage = f.dead ? 'Dead' : f.age && f.age < 30 ? 'Juvenile' : f.age && f.age < 60 ? 'Adult' : 'Elder';
       stageEl.textContent = stage;
     }
 
@@ -223,7 +224,7 @@ export class FishCard {
     // Core stats
     const core = by('#fc-core-stats');
     if (core) {
-      core.textContent = `Speed: ${f.speed ?? '?'} | Sense: ${f.senseRadius ?? '?'} | Hunger: ${f.hungerDrive ?? '?'} | Rarity: ${f.rarityGene ?? '?'} | Con: ${f.constitution ?? '?'}`;
+      core.textContent = `Speed: ${f.speed ?? '?'} | Sense: ${f.senseGene ?? '?'} | Hunger: ${f.hungerDrive ?? '?'} | Rarity: ${f.rarityGene ?? '?'} | Con: ${f.constitution ?? '?'}`;
     }
 
     // Appearance
@@ -312,7 +313,7 @@ export class FishCard {
       <div class="small" style="margin: 4px 0">ID: <span id="fc-id">${f.id}</span></div>
       <div class="small" style="margin: 4px 0">Age: <span id="fc-age">${(f.age / 60).toFixed(1)} min</span> • Size: <span id="fc-size">${f.size.toFixed(1)}</span></div>
       <div class="small" id="fc-core-stats" style="margin: 4px 0">
-        Speed: ${f.speed} • Sense: ${f.senseRadius}
+        Speed: ${f.speed} • Sense: ${f.senseGene}
       </div>
       <div class="small" id="fc-appearance" style="margin: 8px 0 12px 0">
         Pattern: ${f.patternType} • Fin: ${f.finShape}

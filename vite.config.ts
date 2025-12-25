@@ -2,6 +2,7 @@ import { resolve } from 'path';
 
 import { defineConfig } from 'vite';
 import { configDefaults } from 'vitest/config';
+import pkg from './package.json';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -87,4 +88,8 @@ export default defineConfig({
   plugins: [
     // Add any Vite plugins here as needed
   ],
+
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
 });

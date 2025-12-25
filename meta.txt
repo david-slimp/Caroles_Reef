@@ -1,0 +1,6 @@
+name: "Carole's Reef",
+path: "Caroles_Reef/",
+thumb: "Caroles_Reef/caroles_reef-thumb-01.png",
+version: "0.1.3",
+desc: "Genetic exploration in a chill saltwater reef",
+modified: ""

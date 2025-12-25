@@ -564,6 +564,41 @@ body {
   border: none;
   margin-top: 6px;
 }
+
+#breedingHud {
+  position: fixed;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 18, 22, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #f6f6f6;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 10px 12px;
+  width: 220px;
+  z-index: 6;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+#breedingHud .breeding-hud-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  color: #b8ffb8;
+}
+
+#breedingHud .breeding-hud-line {
+  margin-bottom: 4px;
+}
+
+#breedingHud .breeding-hud-line strong {
+  color: #d5f1ff;
+  font-weight: 600;
+}
 #toast {
   position: fixed;
   bottom: 12px;

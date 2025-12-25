@@ -1,76 +1,70 @@
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-- update sed command to be cross-platform compatible ([379fa7e](https://github.com/david-slimp/caroles_reef/commit/379fa7e724e715eea8f48c1c13266aa11c313eeb))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-- update sed command to be cross-platform compatible ([379fa7e](https://github.com/david-slimp/caroles_reef/commit/379fa7e724e715eea8f48c1c13266aa11c313eeb))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-- update sed command to be cross-platform compatible ([379fa7e](https://github.com/david-slimp/caroles_reef/commit/379fa7e724e715eea8f48c1c13266aa11c313eeb))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- trigger new release ([7d97c89](https://github.com/david-slimp/caroles_reef/commit/7d97c89b60565cdede5af2d0a67d27045a5b6fd5))
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-
-## [0.1.2](https://github.com/david-slimp/caroles_reef/compare/v0.1.1...v0.1.2) (2025-08-24)
-
-### Bug Fixes
-
-- resolve multiple confirmation clicks when removing fish ([#9](https://github.com/david-slimp/caroles_reef/issues/9)) ([07962b8](https://github.com/david-slimp/caroles_reef/commit/07962b8e86d5fb43f3bcf575780959aac9c1f529)), closes [#7](https://github.com/david-slimp/caroles_reef/issues/7)
-- update sed command for semantic-release to handle single quotes ([9cbd55d](https://github.com/david-slimp/caroles_reef/commit/9cbd55df42a13e24140c9d0992ee29f852cb251a))
-
 # Changelog
 
-## [Unreleased]
-
+## [0.1.4] - 2025-12-25
 ### Fixed
-
+- Centralized fish collection persistence through `GameState.save()` and `localStorageManager`
+- Removed direct localStorage access from `FishCollection` in active code path
+- Added validation for `fishCollection` entries and normalized top-level trait fields (senseGene, finShape, patternType, eyeType, colorHue)
+- Clamped senseGene to 1-9 and removed legacy senseRadius after validation
 - **Notification System**
   - Fixed issue requiring multiple confirmation clicks when deleting fish from the collection view
   - Resolved duplicate notification messages when renaming fish by pressing Enter
   - Replaced `showNotification` method with direct `toast` function calls for more reliable notifications
   - Improved notification consistency and error handling throughout the FishCollection class - other places in the codebase will still need to be updated to use toast
+- Added inline notes clarifying persistence path in FishCollection updates
+- Removed legacy migration checklist file `check.txt`
+- Clarified Issue #10 scope and captured GameState source-of-truth decision in TODO
+- Added throttled GameState save interval and routed collection updates through GameState
+- Updated fishStorage helpers to update GameState instead of mutating storage clones
+- Updated legacy FishCard name save to update GameState instead of mutating storage clones
+- Removed archived FishCollection variants (`.old`, `.0829_*`, `-tooMuchWorkDoneBroken`)
+- Documented full scan results for GameState/FishManager/globals/localStorage usage
+- Removed duplicate “Save to Collection” toasts by relying on FishCollection feedback
+- Ensured fish spawned from collection carry `originalId` so renames sync to collection
+- Updated default collection name to `NEW` and allowed FishCard renames to sync without `originalId`
+- Allowed FishCard rename input to save on Enter
+- Fixed spawn-from-collection to add fish to tank via `addFishToTank`
+- Preserved saved fish IDs when spawning from collection
+- Normalized fish data on save/spawn so senseGene is consistent across UI
+- Ensured backup/restore normalizes senseRadius to senseGene (tests added)
+- Preserved gene-style stats/appearance when restoring legacy fish without genes and applied senseRadius < 10 conversion (tests added)
+- Prevented spawning duplicate fish from collection and synced tank/FishCard names when collection renames occur
+- Synced release actions with GameState tank tracking to avoid stale in-tank IDs
+- Spawn duplicate check now uses live tank fish list to avoid stale “already in tank” messages after reload
+- Dead fish now remove from the live tank list when they float off-screen
+- Re-enabled pellet detection and eating so fish respond to feed key
+- Mating logic now scans live tank fish and respects canMate so fish seek partners again
+- Ritual partner lookup now uses live tank fish, avoiding a static target from saved data
+- Added a Breeding HUD showing live mating stats for the selected fish
+- Mating/ritual logic now uses the local tank fish array instead of window globals
+- Breeding HUD now shows tank capacity gate and time-to-adult when not adult
+- Fixed duplicate tankFish declaration in mate-seeking logic
+- Clarified runtime source-of-truth: GameState in RAM, localStorage on startup, Backup/Restore for offline import/export
+- Audited in-memory clone paths; no remaining updates that skip persistence
+- Re-checked invalid trait normalization (senseRadius -> senseGene, finShape) across load/save/backup paths
+- Centralized UI version display via `GAME_CONFIG`
+- UI version now sourced from `package.json` via Vite define
+- Bumped app version to 0.1.4
+- Added `deploy:prod` script to run tests, build, and `scripts/deploy.sh`
+- Documented GameState as the single runtime source of truth for Issue #10
 
-## [0.1.2] - 2025-08-22
-
+## [0.1.3] - 2025-08-24
+### Added
+- Added new issue templates
+- Added auto-assignment and labeling for issues/PRs
 ### Fixed
+- Resolved multiple confirmation clicks when removing fish from the collection view (#9)
+- Updated semantic-release configuration to handle versioning correctly
+- Updated sed command for semantic-release to handle single quotes
+- Updated sed command to be cross-platform compatible
+### Changed
+- Bumped project version to 0.1.3
+- CI: made lint/typecheck/test non-blocking and split linting from tests
+- CI: updated actions/upload-artifact to v4
+- Build: added @semantic-release/exec dev dependency
 
+## [0.1.2] - 2025-08-23
+### Fixed
 - Fish tails "finShape" was not drawn in a noticeable difference, so we updated the valid finShapes to be ['pointy', 'round', 'fan', 'forked', 'lunate'] (deprecating 'long') and tweaked the look of each
 - **Fish Validation**
   - Fixed invalid fin shapes (like 'long') being set to 'fan' by default
@@ -78,9 +72,7 @@
   - Ensured corrected fin shapes are saved back to localStorage
 
 ## [0.1.1] - 2025-08-22
-
 ### Changed
-
 - **Project Structure**
   - Moved `style.css` to `src/styles/` for better organization
   - Relocated deployment scripts to `scripts/` directory
@@ -90,9 +82,7 @@
   - Added the new background music (track 02) - from suno.ai
 
 ## [0.1.0] - 2025-08-22
-
 ### Added
-
 - **Creature Validation System**
   - Added trait range validation for all creature attributes
   - Automatic correction of out-of-range values when loading from storage
@@ -105,7 +95,6 @@
   - Clicking the same column toggles between ascending and descending order
 
 ### Fixed
-
 - **Data Integrity**
   - Fixed potential data corruption by validating all creature attributes on load
   - Ensured all numeric traits stay within defined ranges
@@ -119,14 +108,11 @@
 - Had to make some changes to deploy.sh as we moved sensitive data to .env and then deploy.sh started to complain about noEmitOnError.. should be working now.
 
 ### Changed
-
 - Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
 - "Caroles_Reef" had been planned as 3D, and this 2D version was to do a quick-start to show the basic potential of the game. Since then I've decided this 2D version will be the main focus, and PERHAPS a 3D version may come later... but at this point I want the "Caroles_Reef" name and ID to point to the 2D version locally and on GitHub, and we will have a Caroles_Reef-3D if that ever comes about. So I've changed the GitHub repo for this project to https://github.com/david-slimp/Caroles_Reef.git
 
 ## [0.0.8] - 2025-08-15
-
 ### Fixed
-
 - Fixed release button in FishCard to properly remove selected fish from the tank
   - Now correctly identifies and removes the selected fish instead of checking health
   - Properly cleans up fish tracking in tankFishIds
@@ -137,9 +123,7 @@
   - Added comments for better maintainability
 
 ## [0.0.7] - 2025-08-15
-
 ### Fixed
-
 - Fixed animation loop to prevent multiple concurrent frames
 - Resolved background image flickering during rendering
 - Improved canvas rendering performance

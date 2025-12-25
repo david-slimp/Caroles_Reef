@@ -33,4 +33,5 @@ export interface Creature {
   phenotype?: Phenotype;
   parents?: { ma: string; pa: string } | null;
   selected?: boolean;
+  canMate?: boolean; // If false, this creature will not attempt to find a mate
 }

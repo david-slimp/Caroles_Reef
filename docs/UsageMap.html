@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Dependency Map</title>
+    <style>
+        :root {
+            --indent-size: 20px;
+            --highlight-color: #4CAF50;
+            --bg-color: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --hover-bg: #e9ecef;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        
+        .groups-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin-top: 20px;
+        }
+        
+        .group {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .group-title {
+            background-color: #f1f3f5;
+            padding: 12px 20px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            margin: 0;
+        }
+        
+        .tree {
+            list-style: none;
+            padding: 10px 0 10px 0;
+            margin: 0;
+        }
+        
+        .node {
+            position: relative;
+            padding: 8px 20px 8px 40px;
+            margin: 2px 0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-left: 3px solid transparent;
+        }
+        
+        .node:hover {
+            background-color: var(--hover-bg);
+        }
+        
+        .node.highlight {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-left-color: var(--highlight-color);
+        }
+        
+        .node.highlight-path {
+            background-color: rgba(76, 175, 80, 0.2);
+            border-left-color: var(--highlight-color);
+            font-weight: 500;
+        }
+        
+        .node.highlight-path:first-child {
+            font-weight: 600;
+        }
+        
+        .node::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: #e9ecef;
+        }
+        
+        .node.highlight-path::before {
+            background-color: var(--highlight-color);
+        }
+        
+        .node .file-name {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .node .file-path {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-left: 8px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .error {
+            color: #dc3545;
+            padding: 20px;
+            background-color: #f8d7da;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Project Dependency Map</h1>
+        <div id="content">
+            <div class="loading">Loading project dependencies...</div>
+        </div>
+    </div>
+
+    <script>
+        // Embedded ActiveFiles content
+        const ACTIVE_FILES_CONTENT = `## Core Application
+- index.html - Main HTML entry point
+   * REQUIRES: /favicon.ico, src/styles/style.css, src/main.ts
+   * USED-BY: (none - main entry point)
+- src/main.ts - Main TypeScript entry point
+   * REQUIRES: ./audio/audioManager.ts, ./core/events.ts, ./legacy/runLegacyGame.ts
+   * USED-BY: index.html
+
+## Audio System
+- src/audio/audioManager.ts - Audio system manager
+   * REQUIRES: ./sfx.ts, ./bus.ts
+   * USED-BY: src/main.ts
+- src/audio/sfx.ts - Sound effects
+   * REQUIRES: /audio/eat.mp3, /audio/click.mp3
+   * USED-BY: src/audio/audioManager.ts
+- src/audio/bus.ts - Audio bus implementation
+   * REQUIRES: (none)
+   * USED-BY: (none)
+
+## Legacy Game Code
+- src/legacy/runLegacyGame.ts - Main legacy game loop
+   * REQUIRES: howler (npm), src/entities/fish.ts, src/utils/audio.ts, src/entities/decor.ts, src/render/background.ts, src/render/decorRenderer.ts, src/config/themes.ts, src/creatures/validation.ts (dynamic), src/ui/FishCollection.ts (dynamic)
+   * USED-BY: src/main.ts
+
+## Entities
+- src/entities/creature.ts - Base creature type definitions and interfaces
+   * REQUIRES: (none)
+   * USED-BY: src/state/types.ts, src/state/selectors.ts
+- src/entities/fish.ts - Fish entity logic and behavior
+   * REQUIRES: src/utils/audio.ts, src/ui/FishCollection.ts (dynamic)
+   * USED-BY: src/legacy/runLegacyGame.ts, src/creatures/feeding.ts (dynamic)
+- src/entities/pellet.ts - Food pellets for fish
+   * REQUIRES: (none)
+   * USED-BY: (none)
+- src/entities/bubbles.ts - Bubble effects
+   * REQUIRES: (none)
+   * USED-BY: (none)
+- src/entities/decor.ts - Decorations and environment
+   * REQUIRES: src/state/types.ts
+   * USED-BY: src/legacy/runLegacyGame.ts
+
+## Game Logic
+- src/game/creatureLoop.ts - Manages creature updates and rendering
+   * REQUIRES: src/core/env.ts, src/creatures/index.ts, src/creatures/registry.ts, src/creatures/death.ts, src/creatures/constants.ts
+   * USED-BY: (none)
+
+## Engine
+- src/engine/math.ts - Math utility functions (rand, randi, clamp)
+   * REQUIRES: (none)
+   * USED-BY: (none)`;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Parse the embedded content
+                const files = parseManifest(ACTIVE_FILES_CONTENT);
+                
+                // Build the dependency tree
+                const { groups, fileMap } = buildDependencyTree(files);
+                
+                // Render the tree
+                renderTree(groups, fileMap);
+                
+                // Add event listeners for highlighting
+                setupHighlighting(fileMap);
+                
+            } catch (error) {
+                console.error('Error loading dependencies:', error);
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading dependencies:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        function parseManifest(text) {
+            const lines = text.split('\n');
+            const files = new Map();
+            let currentFile = null;
+            let currentSection = null;
+            
+            for (const line of lines) {
+                // Check for file entry (starts with "- ")
+                const fileMatch = /^\s*-\s+([^\s].*?)(?:\s+-\s+.*)?$/.exec(line);
+                if (fileMatch) {
+                    const filePath = fileMatch[1].trim();
+                    currentFile = {
+                        path: filePath,
+                        name: filePath.split('/').pop(),
+                        requires: new Set(),
+                        usedBy: new Set(),
+                        description: ''
+                    };
+                    files.set(filePath, currentFile);
+                    currentSection = null;
+                    continue;
+                }
+                
+                // Check for REQUIRES or USED-BY section
+                const sectionMatch = /^\s*\*\s*(REQUIRES|USED-BY)\s*:\s*(.*)$/i.exec(line);
+                if (sectionMatch) {
+                    const type = sectionMatch[1].toLowerCase();
+                    const content = sectionMatch[2].trim();
+                    
+                    if (content !== '(none)' && currentFile) {
+                        // Split by comma and clean up each path
+                        const paths = content.split(',')
+                            .map(p => p.trim())
+                            .filter(p => p && p !== '(dynamic)' && !p.includes('(dynamic)'));
+                        
+                        const targetSet = type === 'requires' ? currentFile.requires : currentFile.usedBy;
+                        paths.forEach(p => {
+                            // Clean up any remaining dynamic markers
+                            const cleanPath = p.replace(/\(dynamic\)/g, '').trim();
+                            if (cleanPath) targetSet.add(cleanPath);
+                        });
+                    }
+                    currentSection = type;
+                    continue;
+                }
+                
+                // Handle continuation lines for requires/used-by
+                if (currentSection && /^\s{2,}\S/.test(line) && currentFile) {
+                    const content = line.trim();
+                    if (content && content !== '(none)') {
+                        const paths = content.split(',')
+                            .map(p => p.trim())
+                            .filter(p => p && p !== '(dynamic)' && !p.includes('(dynamic)'));
+                        
+                        const targetSet = currentSection === 'requires' ? currentFile.requires : currentFile.usedBy;
+                        paths.forEach(p => {
+                            const cleanPath = p.replace(/\(dynamic\)/g, '').trim();
+                            if (cleanPath) targetSet.add(cleanPath);
+                        });
+                    }
+                }
+            }
+            
+            return files;
+        }
+        
+        function buildDependencyTree(files) {
+            const fileMap = new Map();
+            const children = new Map();
+            const parentCount = new Map();
+            
+            // Initialize maps
+            for (const [path, file] of files.entries()) {
+                fileMap.set(path, file);
+                children.set(path, new Set());
+                parentCount.set(path, 0);
+            }
+            
+            // Build parent-child relationships
+            for (const [path, file] of files.entries()) {
+                // For each file this one is used by (its parents)
+                for (const parentPath of file.usedBy) {
+                    if (fileMap.has(parentPath)) {
+                        children.get(parentPath).add(path);
+                        parentCount.set(path, (parentCount.get(path) || 0) + 1);
+                    }
+                }
+            }
+            
+            // Find root files (not used by any other file or used by files not in our map)
+            const roots = Array.from(files.keys()).filter(
+                path => (parentCount.get(path) || 0) === 0
+            );
+            
+            // Group files by their root
+            const groups = [];
+            const visited = new Set();
+            
+            function buildGroup(rootPath) {
+                if (visited.has(rootPath)) return [];
+                visited.add(rootPath);
+                
+                const group = [rootPath];
+                const queue = [rootPath];
+                
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    for (const child of children.get(current) || []) {
+                        if (!visited.has(child)) {
+                            visited.add(child);
+                            group.push(child);
+                            queue.push(child);
+                        }
+                    }
+                }
+                
+                return group;
+            }
+            
+            // Create a group for each root
+            for (const root of roots) {
+                const group = buildGroup(root);
+                if (group.length > 0) {
+                    groups.push({
+                        root: root,
+                        files: group
+                    });
+                }
+            }
+            
+            // Add any files that weren't included in any group
+            const allIncluded = new Set();
+            groups.forEach(group => {
+                group.files.forEach(file => allIncluded.add(file));
+            });
+            
+            // Find files that weren't included in any group
+            const missingFiles = Array.from(files.keys()).filter(
+                path => !allIncluded.has(path)
+            );
+            
+            // Add each missing file as its own group
+            missingFiles.forEach(path => {
+                groups.push({
+                    root: path,
+                    files: [path]
+                });
+            });
+            
+            return { groups, fileMap };
+        }
+        
+        function renderTree(groups, fileMap) {
+            const container = document.getElementById('content');
+            
+            if (groups.length === 0) {
+                container.innerHTML = '<div class="error">No dependency information found.</div>';
+                return;
+            }
+            
+            // Build children map
+            const children = new Map();
+            fileMap.forEach((file, path) => {
+                children.set(path, new Set());
+            });
+            
+            // Populate children map based on usedBy relationships
+            fileMap.forEach((file, path) => {
+                file.usedBy.forEach(parentPath => {
+                    if (fileMap.has(parentPath)) {
+                        children.get(parentPath).add(path);
+                    }
+                });
+            });
+            
+            let html = '<div class="groups-container">';
+            
+            groups.forEach((group, groupIndex) => {
+                const rootFile = fileMap.get(group.root);
+                const rootName = rootFile ? rootFile.name || group.root : group.root;
+                
+                html += `
+                    <div class="group" data-group-id="group-${groupIndex}">
+                        <h3 class="group-title">${rootName}</h3>
+                        <ul class="tree" id="tree-${groupIndex}">
+                `;
+                
+                // Render the tree starting from the root
+                const renderNode = (path, depth = 0) => {
+                    const file = fileMap.get(path);
+                    if (!file) return '';
+                    
+                    const displayName = file.name || path.split('/').pop();
+                    const indent = depth * 20;
+                    
+                    let nodeHtml = `
+                        <li class="node" 
+                            data-path="${escapeHtml(path)}" 
+                            style="padding-left: ${indent}px;"
+                            title="${escapeHtml(path)}">
+                            <span class="file-name">
+                                ${escapeHtml(displayName)}
+                                <span class="file-path">${escapeHtml(path)}</span>
+                            </span>
+                        </li>
+                    `;
+                    
+                    // Sort children for consistent rendering
+                    const sortedChildren = Array.from(children.get(path) || []).sort();
+                    
+                    return nodeHtml + sortedChildren.map(
+                        child => renderNode(child, depth + 1)
+                    ).join('');
+                };
+                
+                html += renderNode(group.root);
+                
+                html += `
+                        </ul>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function setupHighlighting(fileMap) {
+            // Build a reverse map of file paths to their parent paths
+            const parentMap = new Map();
+            fileMap.forEach((file, path) => {
+                file.usedBy.forEach(parentPath => {
+                    if (!parentMap.has(path)) {
+                        parentMap.set(path, new Set());
+                    }
+                    parentMap.get(path).add(parentPath);
+                });
+            });
+            
+            // Add click handlers to all nodes
+            document.querySelectorAll('.node').forEach(node => {
+                node.addEventListener('click', () => {
+                    const path = node.dataset.path;
+                    highlightPath(path, parentMap);
+                });
+            });
+            
+            // Function to highlight the path from a node to its root
+            function highlightPath(startPath, parentMap) {
+                // First, remove all highlights
+                document.querySelectorAll('.node').forEach(n => {
+                    n.classList.remove('highlight', 'highlight-path');
+                });
+                
+                // Then, highlight the path
+                const path = [startPath];
+                let current = startPath;
+                
+                // Traverse up the parent chain
+                while (parentMap.has(current)) {
+                    const parents = Array.from(parentMap.get(current));
+                    if (parents.length === 0) break;
+                    
+                    // For simplicity, just take the first parent if there are multiple
+                    current = parents[0];
+                    path.unshift(current);
+                }
+                
+                // Apply highlights
+                path.forEach((p, index) => {
+                    const nodes = document.querySelectorAll(`.node[data-path="${p}"]`);
+                    nodes.forEach(n => {
+                        n.classList.add(index === 0 ? 'highlight' : 'highlight-path');
+                    });
+                });
+                
+                // Scroll the first highlighted node into view
+                const firstHighlighted = document.querySelector('.highlight');
+                if (firstHighlighted) {
+                    firstHighlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+        
+        // Helper function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
