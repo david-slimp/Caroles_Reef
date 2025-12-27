@@ -1,4 +1,4 @@
-import type { GameSaveData } from '../utils/localStorageManager';
+import { storageManager, type GameSaveData } from '../utils/localStorageManager';
 
 /**
  * Represents a single fish in the player's collection
@@ -7,7 +7,7 @@ export interface FishCollectionItem {
   /** Unique identifier for the fish */
   id: string;
   /** The fish data including position, state, etc. */
-  fishData: any; // Consider defining a more specific type
+  fishData: FishData;
   /** When the fish was added to the collection */
   timestamp: number;
 }
@@ -27,6 +27,8 @@ export interface GameState extends Omit<GameSaveData, 'fish'> {
   fishCollection: Mutable<FishCollectionItem>[];
 }
 
+type FishData = Record<string, unknown> & { id?: string };
+
 /**
  * Manages the game state and notifies subscribers of changes
  */
@@ -39,6 +41,7 @@ export class GameStateManager {
   private lastSaveAt = 0;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly saveIntervalMs = 60000;
+  private tankSnapshotProvider: (() => FishData[]) | null = null;
 
   private constructor() {
     // Initialize with default state that matches the GameState interface
@@ -48,7 +51,7 @@ export class GameStateManager {
       gameState: {
         gameTime: 0,
         currentScene: 'tank',
-        score: 0
+        score: 0,
       },
       settings: {
         volume: 1.0,
@@ -56,21 +59,24 @@ export class GameStateManager {
         musicMuted: false,
         musicTrack: 'default',
         theme: 'light',
-        uiScale: 1.0
+        uiScale: 1.0,
       },
       tank: {
         background: 'default',
-        decorations: []
+        decorations: [],
       },
       progress: {
         unlocked: [],
-        flags: {}
+        flags: {},
       },
-      fishCollection: []
+      fishCollection: [],
+      tankFish: [],
+      fishInTank: [],
+      fishInTankOriginalIds: [],
     };
-    
+
     this.state = defaultState;
-    
+
     console.log('[GameState] Initialized with default state:', this.state);
   }
 
@@ -95,15 +101,17 @@ export class GameStateManager {
    * Updates the game state using the provided updater function or partial state
    * @param updater Either a function that receives the current state and returns a partial state, or a partial state object
    */
-  public updateState(updater: ((state: GameState) => Partial<GameState>) | Partial<GameState>): void {
+  public updateState(
+    updater: ((state: GameState) => Partial<GameState>) | Partial<GameState>
+  ): void {
     console.groupCollapsed('[GameState] Updating state');
-    
+
     try {
       const prevState = { ...this.state };
-      
+
       // Create a deep clone of the state to detect changes
       const nextState = JSON.parse(JSON.stringify(this.state)) as GameState;
-      
+
       // Apply updates to the cloned state
       let stateUpdate: Partial<GameState>;
       if (typeof updater === 'function') {
@@ -111,39 +119,45 @@ export class GameStateManager {
       } else {
         stateUpdate = updater;
       }
-      
+
       // Merge the updates into the next state
       Object.assign(nextState, stateUpdate);
-      
+
       // Ensure fishCollection is always an array
       if (!Array.isArray(nextState.fishCollection)) {
         console.warn('[GameState] fishCollection was not an array, fixing...');
         nextState.fishCollection = [];
       }
-      
+
       // Log the changes before updating the state
       console.log('State changes:', {
         prevFishCount: prevState.fishCollection?.length || 0,
         nextFishCount: nextState.fishCollection?.length || 0,
-        prevFishIds: prevState.fishCollection?.map((f: any) => f.id) || [],
-        nextFishIds: nextState.fishCollection?.map((f: any) => f.id) || []
+        prevFishIds: prevState.fishCollection?.map(f => f.id) || [],
+        nextFishIds: nextState.fishCollection?.map(f => f.id) || [],
       });
-      
+
       // Update the state reference
       this.state = nextState;
       this.markDirty();
-      
+
       // Notify subscribers
       this.notifySubscribers();
-      
+
       console.log('[GameState] State updated and subscribers notified');
-      
     } catch (error) {
       console.error('[GameState] Error updating state:', error);
       throw error;
     } finally {
       console.groupEnd();
     }
+  }
+
+  /**
+   * Registers a provider for the current live tank snapshot.
+   */
+  public setTankSnapshotProvider(provider: (() => FishData[]) | null): void {
+    this.tankSnapshotProvider = provider;
   }
 
   /**
@@ -182,16 +196,25 @@ export class GameStateManager {
         clearTimeout(this.saveTimer);
         this.saveTimer = null;
       }
-      const { storageManager } = await import('../utils/localStorageManager');
-      
+      const tankFish = this.tankSnapshotProvider
+        ? this.tankSnapshotProvider()
+        : this.state.tankFish;
+      const fishInTank = Array.isArray(this.state.fishInTank) ? this.state.fishInTank : [];
+      const fishInTankOriginalIds = Array.isArray(this.state.fishInTankOriginalIds)
+        ? this.state.fishInTankOriginalIds
+        : [];
+
       // Convert to GameSaveData format
       const saveData: GameSaveData = {
         ...this.state,
         fish: this.state.fishCollection.map(({ fishData }) => fishData),
+        tankFish: Array.isArray(tankFish) ? tankFish : [],
+        fishInTank,
+        fishInTankOriginalIds,
         lastSaved: Date.now(),
-        version: this.state.version || '1.0.0'
+        version: this.state.version || '1.0.0',
       };
-      
+
       storageManager.save(saveData);
       this.lastSaveAt = Date.now();
       this.isDirty = false;
@@ -239,17 +262,17 @@ export class GameStateManager {
     // Convert fish array to fishCollection if needed
     this.state = {
       ...data,
-      fishCollection: Array.isArray(data.fishCollection) 
+      fishCollection: Array.isArray(data.fishCollection)
         ? [...data.fishCollection]
         : Array.isArray(data.fish)
           ? data.fish.map(fish => ({
               id: `fish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               fishData: fish,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             }))
-          : []
+          : [],
     };
-    
+
     this.notifySubscribers();
   }
 }

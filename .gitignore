@@ -47,6 +47,7 @@ build/
 dist/
 out/
 lib-cov/
+coverage/
 .cache/
 .parcel-cache/
 .temp/
@@ -132,4 +133,3 @@ windsurf-workspace.json
 .tern-port
 .vscode-test/
 .pnp.js
-

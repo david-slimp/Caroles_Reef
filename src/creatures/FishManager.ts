@@ -1,8 +1,7 @@
-
-import { storageManager } from '../utils/localStorageManager';
 import gameDataValidator from '../utils/gameDataValidator';
+import { storageManager } from '../utils/localStorageManager';
 
-type FishData = any; // Temporary type until we have the actual type
+type FishData = Record<string, unknown> & { id?: string };
 
 interface SavedFish {
   id: string;
@@ -15,17 +14,17 @@ interface SavedFish {
  * This class is a singleton and should be accessed using the static method getInstance().
  */
 class FishManager {
-/** Singleton instance of the FishManager. */
-private static instance: FishManager;
+  /** Singleton instance of the FishManager. */
+  private static instance: FishManager;
 
-/** In-memory collection of saved fish. */
-private fishCollection: SavedFish[] = [];
+  /** In-memory collection of saved fish. */
+  private fishCollection: SavedFish[] = [];
 
-/** Tracks if the FishManager has been initialized. */
-private isInitialized = false;
+  /** Tracks if the FishManager has been initialized. */
+  private isInitialized = false;
 
-/** Private constructor to enforce singleton pattern. */
-private constructor() {}
+  /** Private constructor to enforce singleton pattern. */
+  private constructor() {}
 
   /**
    * Get the singleton instance of the FishManager.
@@ -50,9 +49,7 @@ private constructor() {}
     try {
       // Load from localStorage via storageManager
       const savedData = storageManager.load();
-      this.fishCollection = Array.isArray(savedData.fishCollection) 
-        ? savedData.fishCollection 
-        : [];
+      this.fishCollection = Array.isArray(savedData.fishCollection) ? savedData.fishCollection : [];
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize FishManager:', error);
@@ -112,19 +109,22 @@ private constructor() {}
       throw new Error('FishManager not initialized. Call initialize() first.');
     }
 
-    const validatedFish = gameDataValidator.validateAndTransformFish(fishData, Math.floor(Date.now() / 1000));
+    const validatedFish = gameDataValidator.validateAndTransformFish(
+      fishData,
+      Math.floor(Date.now() / 1000)
+    );
     if (!validatedFish) {
       throw new Error('Invalid fish data');
     }
 
-    const existingIndex = this.fishCollection.findIndex(f => 
-      f.id === validatedFish.id || f.fishData.id === validatedFish.id
+    const existingIndex = this.fishCollection.findIndex(
+      f => f.id === validatedFish.id || f.fishData.id === validatedFish.id
     );
 
     const fishToSave: SavedFish = {
       id: validatedFish.id || `fish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       fishData: validatedFish,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     if (existingIndex >= 0) {

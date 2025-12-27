@@ -1,4 +1,5 @@
 import { backupManager } from '../utils/BackupManager';
+
 import { toast } from './toast';
 
 /**
@@ -14,37 +15,37 @@ export class BackupManagerUI {
     this.container = document.createElement('div');
     this.container.id = containerId;
     this.container.className = 'backup-manager';
-    
+
     // Create backup button
     this.backupButton = document.createElement('button');
     this.backupButton.className = 'btn-backup';
     this.backupButton.title = 'Backup Game Data';
     this.backupButton.innerHTML = '💾 Backup';
     this.backupButton.addEventListener('click', () => this.handleBackup());
-    
+
     // Create restore button
     this.restoreButton = document.createElement('button');
     this.restoreButton.className = 'btn-restore';
     this.restoreButton.title = 'Restore Game Data';
     this.restoreButton.innerHTML = '🔄 Restore';
     this.restoreButton.addEventListener('click', () => this.fileInput.click());
-    
+
     // Create hidden file input for restore
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
     this.fileInput.accept = '.json';
     this.fileInput.style.display = 'none';
-    this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-    
+    this.fileInput.addEventListener('change', e => this.handleFileUpload(e));
+
     // Add elements to container
     this.container.appendChild(this.backupButton);
     this.container.appendChild(this.restoreButton);
     this.container.appendChild(this.fileInput);
-    
+
     // Add styles
     this.addStyles();
   }
-  
+
   /**
    * Add the backup manager to the DOM
    * @param parentElement Optional parent element to append to (defaults to document.body)
@@ -56,17 +57,17 @@ export class BackupManagerUI {
       console.error('Could not mount BackupManagerUI: No parent element found');
       return;
     }
-    
+
     // Remove existing instance if it exists
     const existing = document.getElementById(this.container.id);
     if (existing) {
       existing.remove();
     }
-    
+
     // Use type assertion to handle both Element and HTMLElement
     (target as HTMLElement).appendChild(this.container);
   }
-  
+
   /**
    * Show backup tag input dialog
    */
@@ -74,7 +75,7 @@ export class BackupManagerUI {
     // Create dialog container
     const dialog = document.createElement('div');
     dialog.className = 'backup-dialog';
-    
+
     // Create dialog content
     dialog.innerHTML = `
       <div class="backup-dialog-content">
@@ -88,7 +89,7 @@ export class BackupManagerUI {
         </div>
       </div>
     `;
-    
+
     // Add styles if not already added
     if (!document.getElementById('backup-dialog-styles')) {
       const style = document.createElement('style');
@@ -175,14 +176,14 @@ export class BackupManagerUI {
       `;
       document.head.appendChild(style);
     }
-    
+
     // Add to document
     document.body.appendChild(dialog);
-    
+
     // Focus the input
     const input = dialog.querySelector('input');
     input?.focus();
-    
+
     // Handle confirm button
     const confirmBtn = dialog.querySelector('#confirmBackup') as HTMLButtonElement | null;
     confirmBtn?.addEventListener('click', () => {
@@ -191,19 +192,19 @@ export class BackupManagerUI {
         alert('Please use only letters and numbers in the tag');
         return;
       }
-      
+
       dialog.remove();
       this.performBackup(tag);
     });
-    
+
     // Handle cancel button
     const cancelBtn = dialog.querySelector('#cancelBackup');
     cancelBtn?.addEventListener('click', () => {
       dialog.remove();
     });
-    
+
     // Close on escape key
-    dialog.addEventListener('keydown', (e) => {
+    dialog.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         dialog.remove();
       } else if (e.key === 'Enter' && confirmBtn) {
@@ -211,7 +212,7 @@ export class BackupManagerUI {
       }
     });
   }
-  
+
   /**
    * Perform the actual backup with the given tag
    * @param tag Optional tag to include in the filename
@@ -225,14 +226,14 @@ export class BackupManagerUI {
       toast('Failed to create backup', true);
     }
   }
-  
+
   /**
    * Handle backup button click
    */
   private handleBackup(): void {
     this.showBackupDialog();
   }
-  
+
   /**
    * Handle file upload for restore
    */
@@ -243,44 +244,44 @@ export class BackupManagerUI {
       console.log('No files selected');
       return;
     }
-    
+
     const file = input.files[0];
     console.log('Selected file:', file.name);
-    
+
     if (!file.name.endsWith('.json')) {
       const errorMsg = 'Please select a valid JSON backup file';
       console.error(errorMsg);
       toast(errorMsg, true);
       return;
     }
-    
+
     try {
       console.log('Showing restore confirmation dialog');
       const preserveTankFish = await this.showRestoreConfirmation();
       console.log('User selected preserveTankFish:', preserveTankFish);
-      
+
       if (preserveTankFish === null) {
         console.log('User cancelled restore operation');
         return; // User cancelled
       }
-      
+
       console.log('Starting backup restore...');
       const success = await backupManager.handleFileUpload({ file, preserveTankFish });
       console.log('Backup restore completed with status:', success);
-      
+
       if (success) {
-        const message = preserveTankFish 
+        const message = preserveTankFish
           ? 'Game data restored successfully! Your current fish are still in the tank.'
           : 'Game data restored successfully!';
         console.log(message);
         toast(message);
-        
+
         // Notify the UI to update without reloading
-        const event = new CustomEvent('backupRestoredUI', { 
-          detail: { 
+        const event = new CustomEvent('backupRestoredUI', {
+          detail: {
             timestamp: new Date().toISOString(),
-            preserveTankFish
-          } 
+            preserveTankFish,
+          },
         });
         window.dispatchEvent(event);
       } else {
@@ -305,7 +306,7 @@ export class BackupManagerUI {
    */
   private showRestoreConfirmation(): Promise<boolean | null> {
     console.log('showRestoreConfirmation called');
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       try {
         // Create overlay
         const overlay = document.createElement('div');
@@ -319,9 +320,9 @@ export class BackupManagerUI {
           'display: flex',
           'justify-content: center',
           'align-items: center',
-          'z-index: 10000'
+          'z-index: 10000',
         ].join(';');
-        
+
         // Create dialog
         const dialog = document.createElement('div');
         dialog.id = 'restore-confirmation-dialog';
@@ -333,9 +334,9 @@ export class BackupManagerUI {
           'color: white',
           'max-width: 90%',
           'width: 400px',
-          'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7)'
+          'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7)',
         ].join(';');
-        
+
         // Add dialog content
         dialog.innerHTML = `
           <h3 style="margin: 0 0 15px 0; color: #f6e05e; font-size: 1.5em;">Restore Backup</h3>
@@ -357,24 +358,24 @@ export class BackupManagerUI {
             </button>
           </div>
         `;
-        
+
         // Add to DOM
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
-        
+
         // Prevent scrolling
         document.body.style.overflow = 'hidden';
-        
+
         // Get references to elements
         const confirmBtn = dialog.querySelector('#confirmRestore') as HTMLButtonElement;
         const cancelBtn = dialog.querySelector('#cancelRestore') as HTMLButtonElement;
         const preserveCheckbox = dialog.querySelector('#preserveTankFish') as HTMLInputElement;
-        
+
         // Log if elements were found
         console.log('Confirm button found:', !!confirmBtn);
         console.log('Cancel button found:', !!cancelBtn);
         console.log('Preserve checkbox found:', !!preserveCheckbox);
-        
+
         if (!confirmBtn || !cancelBtn || !preserveCheckbox) {
           console.error('One or more required elements not found in dialog');
           console.log('Dialog HTML for debugging:', dialog.innerHTML);
@@ -385,11 +386,11 @@ export class BackupManagerUI {
           resolve(null);
           return;
         }
-        
+
         // Focus the confirm button by default
         console.log('Focusing confirm button');
         confirmBtn.focus();
-        
+
         // Set up cleanup function
         const cleanup = () => {
           console.log('Cleaning up dialog');
@@ -399,20 +400,20 @@ export class BackupManagerUI {
           document.removeEventListener('keydown', handleKeyDown);
           document.body.style.overflow = ''; // Restore scrolling
         };
-        
+
         // Set up event handlers
         const handleConfirm = () => {
           console.log('User confirmed restore with preserveTankFish:', preserveCheckbox.checked);
           cleanup();
           resolve(preserveCheckbox.checked);
         };
-        
+
         const handleCancel = () => {
           console.log('User cancelled restore');
           cleanup();
           resolve(null);
         };
-        
+
         // Handle keyboard navigation
         const handleKeyDown = (e: KeyboardEvent) => {
           if (e.key === 'Escape') {
@@ -428,12 +429,12 @@ export class BackupManagerUI {
             }
           }
         };
-        
+
         // Add event listeners
         confirmBtn.addEventListener('click', handleConfirm);
         cancelBtn.addEventListener('click', handleCancel);
         document.addEventListener('keydown', handleKeyDown);
-        
+
         // Log dialog visibility
         setTimeout(() => {
           const dialogEl = document.getElementById('restore-confirmation-dialog');
@@ -445,14 +446,13 @@ export class BackupManagerUI {
             console.log('Dialog opacity:', style.opacity);
           }
         }, 100);
-        
       } catch (error) {
         console.error('Error in showRestoreConfirmation:', error);
         resolve(null);
       }
     });
   }
-  
+
   /**
    * Add styles for the backup manager
    */

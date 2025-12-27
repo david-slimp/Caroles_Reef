@@ -1,6 +1,6 @@
 // /src/render/background.ts
-import { THEMES, type ThemeId } from '../config/themes';
 import { BACKGROUNDS, type BackgroundId } from '../config/backgrounds';
+import { THEMES, type ThemeId } from '../config/themes';
 
 // Cache for loaded images
 const imageCache = new Map<string, HTMLImageElement>();
@@ -16,13 +16,13 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 
     const img = new Image();
     img.src = url;
-    
+
     img.onload = () => {
       imageCache.set(url, img);
       resolve(img);
     };
-    
-    img.onerror = (e) => {
+
+    img.onerror = e => {
       console.error('Failed to load background image:', url, e);
       reject(e);
     };
@@ -41,7 +41,13 @@ export async function drawBackground(
   // Handle custom image background if specified in the theme (preferred)
   if ('background' in spec && spec.background) {
     const bgConfig = BACKGROUNDS[spec.background as BackgroundId];
-    if (bgConfig && 'type' in bgConfig && bgConfig.type === 'custom-image' && 'imageUrl' in bgConfig && bgConfig.imageUrl) {
+    if (
+      bgConfig &&
+      'type' in bgConfig &&
+      bgConfig.type === 'custom-image' &&
+      'imageUrl' in bgConfig &&
+      bgConfig.imageUrl
+    ) {
       try {
         const img = await loadImage(bgConfig.imageUrl);
         // Clear the canvas and draw the image
@@ -53,7 +59,7 @@ export async function drawBackground(
       }
     }
   }
-  
+
   // Fallback to gradient background
   if (spec.stops) {
     const grd = ctx.createLinearGradient(0, 0, 0, H);

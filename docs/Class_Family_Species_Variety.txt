@@ -1,3 +1,5 @@
+Status: Design notes / future planning (not implemented yet)
+
 Carole's Reef game
 
 How do animals relate / breed

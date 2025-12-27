@@ -1,3 +1,5 @@
+Status: Design notes / future planning (not implemented yet)
+
 Egg: (still attached/in mother) - The beginning, where the fish embryo develops within the fertilized egg.
 Larvae: (just "born", in sac, not moving) - Newly hatched fish, still relying on their yolk sac for nourishment.
 Fry: (tiny fish; start moving) -  After the yolk sac is absorbed, they are free-swimming and can forage independently.

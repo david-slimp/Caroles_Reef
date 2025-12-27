@@ -9,8 +9,8 @@ interface AudioState {
 
 // Audio state for different channels
 const audioState: Record<AudioChannel, AudioState> = {
-  music: { volume: 0.1, muted: false },  // 10% volume for music
-  sfx: { volume: 0.8, muted: false }     // 80% volume for sound effects
+  music: { volume: 0.1, muted: false }, // 10% volume for music
+  sfx: { volume: 0.8, muted: false }, // 80% volume for sound effects
 };
 
 let backgroundMusic: HTMLAudioElement | null = null;
@@ -22,7 +22,7 @@ const handleUserInteraction = () => {
   if (!hasUserInteracted) {
     hasUserInteracted = true;
     document.removeEventListener('userInteraction', handleUserInteraction);
-    
+
     // Start background music if not muted
     if (!audioState.music.muted) {
       playBackgroundMusic();
@@ -44,12 +44,12 @@ interface AudioOptions {
  */
 export function toggleMute(channel: AudioChannel): boolean {
   audioState[channel].muted = !audioState[channel].muted;
-  
+
   // Update background music if it's the music channel
   if (channel === 'music' && backgroundMusic) {
     backgroundMusic.muted = audioState.music.muted;
   }
-  
+
   return audioState[channel].muted;
 }
 
@@ -69,7 +69,7 @@ export function isMuted(channel: AudioChannel): boolean {
  */
 export function setVolume(channel: AudioChannel, volume: number) {
   audioState[channel].volume = Math.max(0, Math.min(1, volume));
-  
+
   // Update background music if it's the music channel
   if (channel === 'music' && backgroundMusic) {
     backgroundMusic.volume = audioState.music.volume;
@@ -84,40 +84,44 @@ export function setVolume(channel: AudioChannel, volume: number) {
  */
 export function playSound(url: string, options: AudioOptions = {}) {
   if (audioState.sfx.muted || !hasUserInteracted) return null;
-  
+
   try {
     const { volume = 0.5, fadeOutDuration = 0 } = options;
     // Use relative path that works in both dev and production
     const audio = new Audio(`./audio/${url}`);
-    
+
     // Add error handling for audio loading
-    audio.onerror = (e) => {
+    audio.onerror = e => {
       console.error('Error loading audio:', url, e);
     };
     // Apply SFX volume (from options or default) and channel volume
     const sfxVolume = (options.volume !== undefined ? options.volume : 0.8) * audioState.sfx.volume;
     audio.volume = sfxVolume;
-    
+
     if (fadeOutDuration > 0) {
-      audio.addEventListener('loadedmetadata', () => {
-        const fadeOutStart = (audio.duration * 1000) - fadeOutDuration;
-        
-        const fadeOut = () => {
-          if (audio.currentTime * 1000 >= fadeOutStart) {
-            const progress = (audio.currentTime * 1000 - fadeOutStart) / fadeOutDuration;
-            audio.volume = Math.max(0, volume * (1 - progress));
-          }
-          
-          if (audio.volume <= 0.01) {
-            audio.pause();
-            audio.removeEventListener('timeupdate', fadeOut);
-          }
-        };
-        
-        audio.addEventListener('timeupdate', fadeOut);
-      }, { once: true });
+      audio.addEventListener(
+        'loadedmetadata',
+        () => {
+          const fadeOutStart = audio.duration * 1000 - fadeOutDuration;
+
+          const fadeOut = () => {
+            if (audio.currentTime * 1000 >= fadeOutStart) {
+              const progress = (audio.currentTime * 1000 - fadeOutStart) / fadeOutDuration;
+              audio.volume = Math.max(0, volume * (1 - progress));
+            }
+
+            if (audio.volume <= 0.01) {
+              audio.pause();
+              audio.removeEventListener('timeupdate', fadeOut);
+            }
+          };
+
+          audio.addEventListener('timeupdate', fadeOut);
+        },
+        { once: true }
+      );
     }
-    
+
     audio.play().catch(e => console.warn('Audio playback failed:', e));
     return audio;
   } catch (e) {
@@ -132,25 +136,25 @@ export function playSound(url: string, options: AudioOptions = {}) {
 
 export function playBackgroundMusic() {
   if (!hasUserInteracted) return;
-  
+
   // If music is muted, don't play
   if (audioState.music.muted) {
     if (backgroundMusic) backgroundMusic.pause();
     return;
   }
-  
+
   // Create audio element if it doesn't exist
   if (!backgroundMusic) {
     backgroundMusic = new Audio(`./audio/${BACKGROUND_MUSIC_FILE}`);
     backgroundMusic.loop = true;
     backgroundMusic.volume = audioState.music.volume;
     backgroundMusic.muted = audioState.music.muted;
-    
-    backgroundMusic.onerror = (e) => {
+
+    backgroundMusic.onerror = e => {
       console.error('Error loading background music:', e);
     };
   }
-  
+
   // Play and handle any autoplay restrictions
   const playPromise = backgroundMusic.play();
   if (playPromise !== undefined) {
@@ -183,5 +187,5 @@ export function setMusicVolume(volume: number) {
 // Predefined sound effects
 export const Sounds = {
   release: 'release.mp3',
-  background: BACKGROUND_MUSIC_FILE
+  background: BACKGROUND_MUSIC_FILE,
 };

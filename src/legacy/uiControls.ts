@@ -43,8 +43,18 @@ type Deps = {
 
 export function setupUIControls(ui: UIRefs, deps: Deps) {
   const {
-    isMuted, toggleMute, playBackgroundMusic, pauseBackgroundMusic,
-    toast, bubbles, modeRef, pausedRef, setTheme, refreshDex, decorSelect, fish
+    isMuted,
+    toggleMute,
+    playBackgroundMusic,
+    pauseBackgroundMusic,
+    toast,
+    bubbles,
+    modeRef,
+    pausedRef,
+    setTheme,
+    refreshDex,
+    decorSelect,
+    fish,
   } = deps;
 
   // Backup manager topbar mount (if present)
@@ -88,7 +98,7 @@ export function setupUIControls(ui: UIRefs, deps: Deps) {
 
   // Panels and buttons
   function togglePanel(panel: HTMLElement) {
-    [ui.panelDecor, ui.panelTheme, ui.panelDex].forEach((p) => {
+    [ui.panelDecor, ui.panelTheme, ui.panelDex].forEach(p => {
       if (p !== panel) p.style.display = 'none';
     });
     panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
@@ -109,7 +119,9 @@ export function setupUIControls(ui: UIRefs, deps: Deps) {
 
   // Sliders
   ui.bubbleLevel.oninput = () => (bubbles.targetDensity = parseFloat(ui.bubbleLevel.value));
-  ui.timeSpeed.oninput = () => {/* timeScale handled by caller binding to this input's value */};
+  ui.timeSpeed.oninput = () => {
+    /* timeScale handled by caller binding to this input's value */
+  };
 
   // Decor selectors
   ui.decorType.onchange = (e: any) => (decorSelect.type = e.target.value);

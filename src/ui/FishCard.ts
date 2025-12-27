@@ -18,7 +18,7 @@ export function getTailShapeDisplayName(shape: TailShape): string {
     round: 'Round',
     fan: 'Fan',
     forked: 'Forked',
-    lunate: 'Lunate'
+    lunate: 'Lunate',
   };
   return names[shape] || shape;
 }
@@ -28,16 +28,20 @@ export interface ParentsRef {
   pa?: string;
 }
 
-export interface FishData extends Omit<CreatureBase, 'speciesId' | 'birthSize' | 'energy' | 'health' | 'direction' | 'generation' | 'parents'> {
+export interface FishData
+  extends Omit<
+    CreatureBase,
+    'speciesId' | 'birthSize' | 'energy' | 'health' | 'direction' | 'generation' | 'parents'
+  > {
   id: string;
   name?: string;
   species?: string;
   generation?: number;
 
-    // Visual
+  // Visual
   colorHue?: number;
   patternType?: string;
-  /** 
+  /**
    * The shape of the fish's tail/fin
    * @see {TailShape}
    */
@@ -204,7 +208,13 @@ export class FishCard {
     // Stage
     const stageEl = by('#fc-stage');
     if (stageEl) {
-      const stage = f.dead ? 'Dead' : f.age && f.age < 30 ? 'Juvenile' : f.age && f.age < 60 ? 'Adult' : 'Elder';
+      const stage = f.dead
+        ? 'Dead'
+        : f.age && f.age < 30
+          ? 'Juvenile'
+          : f.age && f.age < 60
+            ? 'Adult'
+            : 'Elder';
       stageEl.textContent = stage;
     }
 

@@ -14,11 +14,11 @@ export interface AppState {
   decors: { id: string; type: string; x: number; y: number; r: number; size: 's' | 'm' | 'l' }[];
 }
 
-export const DECOR_TYPES = ['plant','coral','rock','chest'] as const;
-export type DecorKind = typeof DECOR_TYPES[number];
+export const DECOR_TYPES = ['plant', 'coral', 'rock', 'chest'] as const;
+export type DecorKind = (typeof DECOR_TYPES)[number];
 
-export const DECOR_SIZES = ['s','m','l'] as const;
-export type DecorSize = typeof DECOR_SIZES[number];
+export const DECOR_SIZES = ['s', 'm', 'l'] as const;
+export type DecorSize = (typeof DECOR_SIZES)[number];
 
 export type Decor = {
   id: string;

@@ -9,7 +9,7 @@ export interface BackgroundConfig {
   // For custom image
   imageUrl?: string;
   // For future extensions
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const BACKGROUNDS: Record<string, BackgroundConfig> = {

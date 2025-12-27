@@ -7,6 +7,7 @@ export function attachInputHandlers(opts: {
   canvas: HTMLCanvasElement;
   getSize: () => { W: number; H: number };
   clamp: (v: number, a: number, b: number) => number;
+  topInset?: number;
   pickFish: (x: number, y: number) => any | null;
   placeDecor: (x: number, y: number) => void;
   showFishCard: (f: any) => void;
@@ -14,24 +15,36 @@ export function attachInputHandlers(opts: {
   modeRef: { value: string };
   panelDecorEl: HTMLElement;
 }) {
-  const { canvas, getSize, clamp, pickFish, placeDecor, showFishCard, addPellet, modeRef, panelDecorEl } = opts;
+  const {
+    canvas,
+    getSize,
+    clamp,
+    topInset,
+    pickFish,
+    placeDecor,
+    showFishCard,
+    addPellet,
+    modeRef,
+    panelDecorEl,
+  } = opts;
 
-  let mouse = { x: 0, y: 0, down: false };
+  const mouse = { x: 0, y: 0, down: false };
   let dragging: any = null;
-  let dragOffset = { x: 0, y: 0 };
+  const dragOffset = { x: 0, y: 0 };
 
-  canvas.addEventListener('mousemove', (e) => {
+  canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = e.clientX - rect.left;
     mouse.y = e.clientY - rect.top;
     const { W, H } = getSize();
+    const minY = Math.max(10, topInset || 0);
     if (dragging) {
       dragging.x = clamp(mouse.x - dragOffset.x, 10, W - 10);
-      dragging.y = clamp(mouse.y - dragOffset.y, 10, H - 10);
+      dragging.y = clamp(mouse.y - dragOffset.y, minY, H - 10);
     }
   });
 
-  canvas.addEventListener('mousedown', (e) => {
+  canvas.addEventListener('mousedown', e => {
     mouse.down = true;
     const f = pickFish(mouse.x, mouse.y);
     if (f) {
@@ -50,7 +63,7 @@ export function attachInputHandlers(opts: {
     }
   });
 
-  canvas.addEventListener('click', (e) => {
+  canvas.addEventListener('click', e => {
     const f = pickFish(mouse.x, mouse.y);
     if (f) {
       showFishCard(f);

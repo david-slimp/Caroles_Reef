@@ -1,5 +1,9 @@
 # Development Tooling
 
+## Status
+
+- Mixed: reflects current scripts; some tools are installed but not wired yet
+
 ## Core Tools
 
 ### Package Management
@@ -21,9 +25,7 @@
 - **Prettier** - Code formatting
   - Config: `.prettierrc`
   - Run: `npm run format`
-- **Stylelint** - CSS/SCSS linting
-  - Config: `.stylelintrc.json`
-  - Run: `npm run lint:styles`
+- **Stylelint** - Installed but not currently wired (no config/script yet)
 
 ### Testing
 
@@ -36,15 +38,13 @@
 ### Git Hooks
 
 - **Husky** - Git hooks
-  - Pre-commit: Runs linting and tests
-  - Commit-msg: Validates commit messages
+  - Pre-commit: Runs `lint-staged`
 
 ## Editor Configuration
 
 ### VS Code
 
-- Recommended extensions in `.vscode/extensions.json`
-- Settings in `.vscode/settings.json`
+- No project-level VS Code config currently checked in
 
 ## Build & Deployment
 

@@ -2,6 +2,7 @@ import { resolve } from 'path';
 
 import { defineConfig } from 'vite';
 import { configDefaults } from 'vitest/config';
+
 import pkg from './package.json';
 
 // https://vitejs.dev/config/
@@ -26,7 +27,7 @@ export default defineConfig({
   // Build configuration
   // Static asset handling
   publicDir: 'public',
-  
+
   // Ensure public files are properly copied
   build: {
     outDir: 'dist',

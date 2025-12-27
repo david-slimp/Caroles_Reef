@@ -48,6 +48,16 @@
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+
+        .status-note {
+            background: #fff3cd;
+            color: #6a4b16;
+            border: 1px solid #ffe69c;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
         
         .group-title {
             background-color: #f1f3f5;
@@ -136,6 +146,10 @@
 </head>
 <body>
     <div class="container">
+        <div class="status-note">
+            Status: Planning snapshot. This file may be outdated; use docs/ActiveFiles.txt for the
+            current active file list.
+        </div>
         <h1>Project Dependency Map</h1>
         <div id="content">
             <div class="loading">Loading project dependencies...</div>

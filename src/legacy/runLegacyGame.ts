@@ -4,26 +4,36 @@
  * The goal is to keep behavior identical while splitting logic into modules.
  */
 
-import {
-  configureFish, makeFish, updateFish, drawFish,
-  handleBreeding, pickFish
-} from '../entities/fish';
-
-import { playSound, Sounds, toggleMute, isMuted, playBackgroundMusic, pauseBackgroundMusic } from '../utils/audio';
+import { fishManager } from '../creatures/FishManager';
 import { configureDecor, decorSelect, placeDecor } from '../entities/decor';
+import {
+  configureFish,
+  makeFish,
+  updateFish,
+  drawFish,
+  handleBreeding,
+  pickFish,
+} from '../entities/fish';
 import { drawBackground } from '../render/background';
 import { configureDecorRenderer, drawDecor } from '../render/decorRenderer';
-import { backupManagerUI } from '../ui/BackupManagerUI';
-import { fishManager } from '../creatures/FishManager';
-import { storageManager } from '../utils/localStorageManager';
 import { gameState } from '../state/GameState';
+import { backupManagerUI } from '../ui/BackupManagerUI';
+import {
+  playSound,
+  Sounds,
+  toggleMute,
+  isMuted,
+  playBackgroundMusic,
+  pauseBackgroundMusic,
+} from '../utils/audio';
+import gameDataValidator from '../utils/gameDataValidator';
 
 import { createBubbles } from './bubbles';
-import { addPellet, updatePellets, drawPellets as _drawPellets } from './pellets';
 import { createFishCardUI } from './fishCardUI';
-import { setupUIControls } from './uiControls';
 import { attachInputHandlers } from './inputHandlers';
+import { addPellet, updatePellets, drawPellets as _drawPellets } from './pellets';
 import { createRenderer } from './renderer';
+import { setupUIControls } from './uiControls';
 
 export async function runLegacyGame(canvasId: string = 'c') {
   // Initialize FishManager and global GameState as before
@@ -60,12 +70,15 @@ export async function runLegacyGame(canvasId: string = 'c') {
   const timeSpeed = document.getElementById('timeSpeed') as HTMLInputElement;
   const decorType = document.getElementById('decorType') as HTMLSelectElement;
   const decorSize = document.getElementById('decorSize') as HTMLSelectElement;
+  const topbarEl = document.querySelector('.topbar') as HTMLElement | null;
 
   // Backup manager UI mount
   backupManagerUI.mount(document.querySelector('.topbar') as HTMLElement);
 
   // === Canvas size / DPR ===
-  let W = 0, H = 0;
+  let W = 0,
+    H = 0;
+  let topInset = 0;
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
@@ -74,6 +87,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    topInset = topbarEl ? topbarEl.offsetHeight : 0;
   }
   window.addEventListener('resize', resize);
   resize();
@@ -93,7 +107,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
   const pellets: any[] = [];
   const decors: any[] = [];
   let generation = 1;
-  let discovered = new Set<string>();
+  const discovered = new Set<string>();
   const tankFishIds = new Set<string>();
 
   const MAX_FISH_BASE = 60;
@@ -136,8 +150,11 @@ export async function runLegacyGame(canvasId: string = 'c') {
     fish,
     discovered,
     toast,
-    incGeneration: () => { generation++; },
+    incGeneration: () => {
+      generation++;
+    },
     maxFish: MAX_FISH_BASE,
+    topInset,
   });
 
   configureDecor({
@@ -155,8 +172,87 @@ export async function runLegacyGame(canvasId: string = 'c') {
     rand,
   });
 
-  // === Initial population (same) ===
-  for (let i = 0; i < 10; i++) fish.push(makeFish({ initialFish: true }));
+  gameState.setTankSnapshotProvider(() => fish.map(f => JSON.parse(JSON.stringify(f))));
+
+  const flushTankSave = () => {
+    try {
+      void gameState.save();
+    } catch (error) {
+      console.error('[GameState] Failed to flush save on exit:', error);
+    }
+  };
+  window.addEventListener('beforeunload', flushTankSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushTankSave();
+    }
+  });
+
+  // === Initial population ===
+  const currentState = gameState.getState();
+  const savedCollection = currentState.fishCollection || [];
+  const savedTankFish = Array.isArray(currentState.tankFish) ? currentState.tankFish : [];
+  const tankIds = new Set<string>([
+    ...(currentState.fishInTank || []),
+    ...(currentState.fishInTankOriginalIds || []),
+  ]);
+  if (savedTankFish.length > 0) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    for (const entry of savedTankFish) {
+      const normalized = gameDataValidator.validateAndTransformFish(entry, timestamp);
+      if (!normalized) continue;
+      const safeX =
+        typeof normalized.x === 'number' ? clamp(normalized.x, 40, W - 40) : rand(40, W - 40);
+      const minY = Math.max(40, topInset + 10);
+      const safeY =
+        typeof normalized.y === 'number' ? clamp(normalized.y, minY, H - 40) : rand(minY, H - 40);
+      const override = {
+        ...normalized,
+        x: safeX,
+        y: safeY,
+        _mateId: null,
+        _breedCd: 0,
+        _ritualTimer: 0,
+        state: 'wander',
+      };
+      const newFish = makeFish({ override });
+      const originalId = (entry as { originalId?: string }).originalId || newFish.id;
+      newFish.originalId = originalId;
+      fish.push(newFish);
+    }
+  } else if (savedCollection.length > 0) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    for (const entry of savedCollection) {
+      const entryId = entry.id || entry.fishData?.id;
+      if (tankIds.size > 0 && entryId && !tankIds.has(entryId)) {
+        continue;
+      }
+      const fishData = entry.fishData || entry;
+      const normalized = gameDataValidator.validateAndTransformFish(fishData, timestamp);
+      if (!normalized) continue;
+      const safeX =
+        typeof normalized.x === 'number' ? clamp(normalized.x, 40, W - 40) : rand(40, W - 40);
+      const minY = Math.max(40, topInset + 10);
+      const safeY =
+        typeof normalized.y === 'number' ? clamp(normalized.y, minY, H - 40) : rand(minY, H - 40);
+      const override = {
+        ...normalized,
+        id: entry.id || normalized.id,
+        name: entry.name || normalized.name,
+        x: safeX,
+        y: safeY,
+        _mateId: null,
+        _breedCd: 0,
+        _ritualTimer: 0,
+        state: 'wander',
+      };
+      const newFish = makeFish({ override });
+      newFish.originalId = entry.id || normalized.id;
+      fish.push(newFish);
+    }
+  } else {
+    for (let i = 0; i < 10; i++) fish.push(makeFish({ initialFish: true }));
+  }
 
   // === Fish Card UI ===
   const fishCardUI = createFishCardUI({
@@ -168,14 +264,37 @@ export async function runLegacyGame(canvasId: string = 'c') {
 
   // === UI Controls (panels, audio, sliders, theme) ===
   const ui = {
-    panelDecor, panelTheme, panelDex, dexList, discEl,
-    popEl, genEl, toastEl, pauseEl,
-    btnFood, btnDecor, btnTheme, btnDex, btnCollection,
-    muteSfxBtn, muteMusicBtn, bubbleLevel, timeSpeed, decorType, decorSize
+    panelDecor,
+    panelTheme,
+    panelDex,
+    dexList,
+    discEl,
+    popEl,
+    genEl,
+    toastEl,
+    pauseEl,
+    btnFood,
+    btnDecor,
+    btnTheme,
+    btnDex,
+    btnCollection,
+    muteSfxBtn,
+    muteMusicBtn,
+    bubbleLevel,
+    timeSpeed,
+    decorType,
+    decorSize,
   };
   const { togglePanel } = setupUIControls(ui, {
-    isMuted, toggleMute, playBackgroundMusic, pauseBackgroundMusic, toast,
-    bubbles, modeRef, pausedRef, setTheme,
+    isMuted,
+    toggleMute,
+    playBackgroundMusic,
+    pauseBackgroundMusic,
+    toast,
+    bubbles,
+    modeRef,
+    pausedRef,
+    setTheme,
     refreshDex: () => refreshDex(),
     decorSelect,
     fish,
@@ -189,6 +308,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
     canvas,
     getSize: () => ({ W, H }),
     clamp,
+    topInset,
     pickFish,
     placeDecor,
     showFishCard: fishCardUI.showFishCard,
@@ -206,7 +326,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
       dexList.innerHTML = '<div class="notice">Discover new pattern/fin combos by breeding!</div>';
       return;
     }
-    arr.forEach((k) => {
+    arr.forEach(k => {
       const [p, f] = (k as string).split('-');
       const div = document.createElement('div');
       div.innerHTML = `<span class="badge">${p}</span> <span class="badge">${f}</span>`;
@@ -221,7 +341,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
     themeRef,
     drawBackground,
     drawDecor,
-    drawPellets: (ctx2) => _drawPellets(ctx2, pellets),
+    drawPellets: ctx2 => _drawPellets(ctx2, pellets),
     drawFish,
     fish,
     bubbles,
@@ -236,7 +356,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
       time += dt;
       // update
       updatePellets(pellets, dt, H);
-      fish.forEach((f) => updateFish(f, dt));
+      fish.forEach(f => updateFish(f, dt));
       handleBreeding(dt);
       bubbles.update(dt);
       popEl.textContent = `Fish: ${fish.length}`;

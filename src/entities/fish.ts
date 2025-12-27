@@ -1,22 +1,51 @@
 // src/entities/fish.ts
-// @ts-nocheck
-import { playSound, Sounds } from '../utils/audio';
 import { gameState } from '../state/GameState';
 import { toast } from '../ui/toast';
+import { playSound } from '../utils/audio';
 
 // Sound effect for new fish births and death
 const YIPPIE_SOUND = 'yippie.ogg';
 const DEATH_SOUND = 'dead.mp3';
 
+type FishEntity = Record<string, unknown> & {
+  id?: string;
+  originalId?: string;
+  name?: string;
+  size?: number;
+  maxSize?: number;
+  age?: number;
+  sex?: string;
+  dead?: boolean;
+  favorite?: boolean;
+  state?: string;
+  canMate?: boolean;
+  senseGene?: number;
+  senseRadius?: number;
+  speed?: number;
+  hungerDrive?: number;
+  rarityGene?: number;
+  constitution?: number;
+  patternType?: string;
+  finShape?: string;
+  eyeType?: string;
+  colorHue?: number;
+  _mateId?: string | null;
+  _ritualTimer?: number;
+  _bites?: unknown[];
+  _corpseArea?: number;
+  vx?: number;
+  vy?: number;
+  x?: number;
+  y?: number;
+  _lastUpdateTime?: number;
+};
+
 // Global state for fish module
-let ctx: CanvasRenderingContext2D;
 let viewportSize: { W: number; H: number } = { W: 0, H: 0 };
-let pellets: any[] = [];
-let decors: any[] = [];
-let fish: any[] = [];
-let discovered: Set<string> = new Set();
-let onIncGeneration: (() => void) | null = null;
-let maxFish = 60;
+let getSizeFn: () => { W: number; H: number } = () => viewportSize;
+let pellets: unknown[] = [];
+let fish: FishEntity[] = [];
+let topInset = 10;
 
 /**
  * Configure fish module with required dependencies
@@ -25,33 +54,38 @@ let maxFish = 60;
 export function configureFish(config: {
   getSize: () => { W: number; H: number };
   ctx: CanvasRenderingContext2D;
-  pellets: any[];
-  decors: any[];
-  fish: any[];
+  pellets: unknown[];
+  decors: unknown[];
+  fish: FishEntity[];
   discovered: Set<string>;
   toast: (msg: string, isError?: boolean) => void;
   incGeneration: () => void;
   maxFish: number;
+  topInset?: number;
 }) {
-  ctx = config.ctx;
+  getSizeFn = config.getSize;
   viewportSize = config.getSize();
   pellets = config.pellets;
-  decors = config.decors;
   fish = config.fish;
-  discovered = config.discovered;
-  onIncGeneration = config.incGeneration;
-  maxFish = config.maxFish;
+  if (typeof config.topInset === 'number') {
+    topInset = config.topInset;
+  }
+}
+
+function syncViewportSize() {
+  viewportSize = getSizeFn();
+  return viewportSize;
 }
 
 /**
  * Adds a fish to the active tank and syncs GameState tracking.
  */
 export function hasFishInTank(targetId: string): boolean {
-  return fish.some((f) => f.id === targetId || f.originalId === targetId);
+  return fish.some(f => f.id === targetId || f.originalId === targetId);
 }
 
 export function updateFishNameInTank(targetId: string, newName: string): boolean {
-  const tankFish = fish.find((f) => f.id === targetId || f.originalId === targetId);
+  const tankFish = fish.find(f => f.id === targetId || f.originalId === targetId);
   if (!tankFish) {
     return false;
   }
@@ -59,9 +93,9 @@ export function updateFishNameInTank(targetId: string, newName: string): boolean
   return true;
 }
 
-export function addFishToTank(newFish: any): void {
+export function addFishToTank(newFish: FishEntity): void {
   const targetIds = [newFish.id, newFish.originalId].filter(Boolean);
-  if (targetIds.some((id) => hasFishInTank(id))) {
+  if (targetIds.some(id => hasFishInTank(id))) {
     return;
   }
 
@@ -79,31 +113,38 @@ export function addFishToTank(newFish: any): void {
 }
 
 /* ---------------- utils ---------------- */
-const rand  = (a, b) => Math.random() * (b - a) + a;
+const rand = (a, b) => Math.random() * (b - a) + a;
 const randi = (a, b) => Math.floor(rand(a, b));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const chance = p => Math.random() < p;
-const uuid = (() => { let i = 0; return () => (++i).toString(36) + '-' + Date.now().toString(36); })();
+const uuid = (() => {
+  let i = 0;
+  return () => (++i).toString(36) + '-' + Date.now().toString(36);
+})();
 
 // normal(μ, σ) via Box–Muller
-function gaussian(mean=0, sd=1){
-  let u=0,v=0;
-  while(u===0) u=Math.random();
-  while(v===0) v=Math.random();
-  const z = Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-  return mean + sd*z;
+function gaussian(mean = 0, sd = 1) {
+  let u = 0,
+    v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return mean + sd * z;
 }
 
 /* ---------------- state helpers ---------------- */
-function isCorpse(f:any){ return !!f.dead; }
+function isCorpse(f: FishEntity) {
+  return !!f.dead;
+}
 
-function estimateCorpseArea(f:any){
-  const bodyLen = clamp(f.size*2.2, 16, 140);
-  const bodyHt  = clamp(f.size*1.2, 10, 80);
+function estimateCorpseArea(f: FishEntity) {
+  const size = typeof f.size === 'number' ? f.size : 0;
+  const bodyLen = clamp(size * 2.2, 16, 140);
+  const bodyHt = clamp(size * 1.2, 10, 80);
   return Math.PI * (bodyLen * 0.5) * (bodyHt * 0.5);
 }
 
-function killFish(f:any){
+function killFish(f: FishEntity) {
   if (f.favorite || f.dead) return;
   f.dead = true;
   f.state = 'dead';
@@ -118,55 +159,69 @@ function killFish(f:any){
 }
 
 /* ---------------- legacy-ish data ---------------- */
-const patterns = ['solid','stripes','spots','gradient'];
+const patterns = ['solid', 'stripes', 'spots', 'gradient'];
 const fins = ['pointy', 'round', 'fan', 'forked', 'lunate'];
-const eyes     = ['round','sleepy','sparkly','winking'];
+const eyes = ['round', 'sleepy', 'sparkly', 'winking'];
 
 /* ---------------- genetics helpers ---------------- */
-function inheritNum(a,b){ return Math.random()<0.5? a : b; }
-function mutateNum(v, mutationChance = 0.05){ 
-  if(chance(mutationChance)) return clamp(v + (chance(0.5)?1:-1), 0, 9); 
-  return v; 
+function inheritNum(a, b) {
+  return Math.random() < 0.5 ? a : b;
 }
-function inheritList(a,b){ return Math.random()<0.5? a : b; }
-function mutateHue(h, mutationChance = 0.05){ 
-  if(chance(mutationChance)) return (h + randi(-20,21) + 360) % 360; 
-  return h; 
+function mutateNum(v, mutationChance = 0.05) {
+  if (chance(mutationChance)) return clamp(v + (chance(0.5) ? 1 : -1), 0, 9);
+  return v;
 }
-function maybeShiny(rarityGene){ return chance(0.02 + rarityGene*0.002); }
+function inheritList(a, b) {
+  return Math.random() < 0.5 ? a : b;
+}
+function mutateHue(h, mutationChance = 0.05) {
+  if (chance(mutationChance)) return (h + randi(-20, 21) + 360) % 360;
+  return h;
+}
+function maybeShiny(rarityGene) {
+  return chance(0.02 + rarityGene * 0.002);
+}
 
 /* ---------------- new gene knobs ---------------- */
 const BREED = {
-  MIN_AGE_SEC: 4*60,  // must be at least 4 minutes old
+  MIN_AGE_SEC: 4 * 60, // must be at least 4 minutes old
   MIN_SIZE_FRAC: 0.5, // and at least 50% of max size
 };
 
 const LIFE = {
-  RISE_SPEED: 20,     // corpse float up speed (px/s)
-  OFF_Y: -20,         // despawn when above this
+  RISE_SPEED: 20, // corpse float up speed (px/s)
+  OFF_Y: -20, // despawn when above this
 };
 
 const SIZE_GENE = {
   BIRTH_MIN: 1,
   BIRTH_MAX: 60,
-  MAX_MIN:  20,
-  MAX_MAX:  120,
-  MUT_P: 0.10,
+  MAX_MIN: 20,
+  MAX_MAX: 120,
+  MUT_P: 0.1,
   MUT_STEP: 2,
 };
 
-function sampleConstitution(){ return Math.round(clamp(gaussian(5,2), 0, 9)); }
-function computeMaxAgeSeconds(constitution:number){ return 60 + constitution * 120 + rand(-30, 30); }
+function sampleConstitution() {
+  return Math.round(clamp(gaussian(5, 2), 0, 9));
+}
+function computeMaxAgeSeconds(constitution: number) {
+  return 60 + constitution * 120 + rand(-30, 30);
+}
 
-function mutateSizeGene(v:number, min:number, max:number){
+function mutateSizeGene(v: number, min: number, max: number) {
   if (chance(SIZE_GENE.MUT_P)) {
     const delta = chance(0.5) ? SIZE_GENE.MUT_STEP : -SIZE_GENE.MUT_STEP;
     return clamp(v + delta, min, max);
   }
   return v;
 }
-function inheritBirthSize(a:number,b:number){ return mutateSizeGene(inheritNum(a,b), SIZE_GENE.BIRTH_MIN, SIZE_GENE.BIRTH_MAX); }
-function inheritMaxSize(a:number,b:number){ return mutateSizeGene(inheritNum(a,b), SIZE_GENE.MAX_MIN, SIZE_GENE.MAX_MAX); }
+function inheritBirthSize(a: number, b: number) {
+  return mutateSizeGene(inheritNum(a, b), SIZE_GENE.BIRTH_MIN, SIZE_GENE.BIRTH_MAX);
+}
+function inheritMaxSize(a: number, b: number) {
+  return mutateSizeGene(inheritNum(a, b), SIZE_GENE.MAX_MIN, SIZE_GENE.MAX_MAX);
+}
 
 /* ---------------- environment helpers ---------------- */
 function nearDecorType(x: number, y: number, type: string, rad?: number): boolean {
@@ -179,7 +234,7 @@ function nearDecorType(x: number, y: number, type: string, rad?: number): boolea
  */
 async function removeFish(id: string): Promise<void> {
   try {
-    const fishIndexInTank = fish.findIndex((f) => f.id === id);
+    const fishIndexInTank = fish.findIndex(f => f.id === id);
     const fishToRemove = fishIndexInTank >= 0 ? fish[fishIndexInTank] : undefined;
     if (fishIndexInTank >= 0) {
       fish.splice(fishIndexInTank, 1);
@@ -190,11 +245,11 @@ async function removeFish(id: string): Promise<void> {
     const fishInTankOriginalIds = [...(currentState.fishInTankOriginalIds || [])];
     const originalId = fishToRemove?.originalId;
     const fishIndex = fishInTank.findIndex(fishId => fishId === id);
-    
+
     if (fishIndex >= 0) {
       fishInTank.splice(fishIndex, 1);
       if (originalId) {
-        const originalIndex = fishInTankOriginalIds.findIndex((savedId) => savedId === originalId);
+        const originalIndex = fishInTankOriginalIds.findIndex(savedId => savedId === originalId);
         if (originalIndex >= 0) {
           fishInTankOriginalIds.splice(originalIndex, 1);
         }
@@ -208,43 +263,53 @@ async function removeFish(id: string): Promise<void> {
 
 /* ---------------- corpse bites ---------------- */
 const CORPSE = {
-  BITE_RADIUS: 2.5,   // ~5px diameter
-  BITE_GROWTH: 1,     // size gain per bite
+  BITE_RADIUS: 2.5, // ~5px diameter
+  BITE_GROWTH: 1, // size gain per bite
 };
 
 /* ---------------- public API ---------------- */
-export function makeFish(opts = {}){
-  const { W, H } = viewportSize;
+export function makeFish(
+  opts: {
+    parents?: unknown;
+    initialFish?: boolean;
+    size?: number;
+    override?: Partial<FishEntity>;
+  } = {}
+) {
+  const { W, H } = syncViewportSize();
   const id = uuid();
 
   const birthSizeGene = 2;
-  const maxSizeGene   = 30;
-  const constitution  = sampleConstitution();
+  const maxSizeGene = 30;
+  const constitution = sampleConstitution();
 
-  const base:any = {
-    id, name: '',
-    _eatCd: 0,  // Eating cooldown timer (in seconds)
-    x: rand(40, W-40), y: rand(40, H-40),
-    vx: rand(-30,30), vy: rand(-30,30),
-    dir: rand(0, Math.PI*2),
+  const base: FishEntity = {
+    id,
+    name: '',
+    _eatCd: 0, // Eating cooldown timer (in seconds)
+    x: rand(40, W - 40),
+    y: rand(40, H - 40),
+    vx: rand(-30, 30),
+    vy: rand(-30, 30),
+    dir: rand(0, Math.PI * 2),
 
     birthSize: birthSizeGene,
-    maxSize:   maxSizeGene,
+    maxSize: maxSizeGene,
     size: undefined, // set below
 
-    birthTime: Math.floor(Date.now() / 1000),  // seconds since epoch 1970-01-01T00:00:00Z
+    birthTime: Math.floor(Date.now() / 1000), // seconds since epoch 1970-01-01T00:00:00Z
     age: 0,
-    sex: chance(0.5)? 'F':'M',
+    sex: chance(0.5) ? 'F' : 'M',
 
     constitution,
-    speed: randi(2,8),
-    senseGene: randi(0,9),
-    hungerDrive: randi(2,8),
-    rarityGene: randi(0,9),
-    colorHue: randi(0,360),
-    patternType: patterns[randi(0,patterns.length)],
-    finShape: fins[randi(0,fins.length)],
-    eyeType: eyes[randi(0,eyes.length)],
+    speed: randi(2, 8),
+    senseGene: randi(0, 9),
+    hungerDrive: randi(2, 8),
+    rarityGene: randi(0, 9),
+    colorHue: randi(0, 360),
+    patternType: patterns[randi(0, patterns.length)],
+    finShape: fins[randi(0, fins.length)],
+    eyeType: eyes[randi(0, eyes.length)],
 
     parents: opts.parents || null,
     shiny: false,
@@ -260,9 +325,12 @@ export function makeFish(opts = {}){
 
     // Newborn slow-drift
     freezeFor: 0,
-    _spawnY0: undefined, _spawnYOffset: undefined,
-    _nbBirthX: undefined, _nbBirthY: undefined,
-    _nbDirX: undefined,   _nbDirY: undefined,
+    _spawnY0: undefined,
+    _spawnYOffset: undefined,
+    _nbBirthX: undefined,
+    _nbBirthY: undefined,
+    _nbDirX: undefined,
+    _nbDirY: undefined,
     _nbPhase: undefined,
 
     // Lifespan
@@ -275,32 +343,43 @@ export function makeFish(opts = {}){
     _corpseArea: undefined,
 
     // Flee after bite
-    _fleeFromX: undefined, _fleeFromY: undefined,
+    _fleeFromX: undefined,
+    _fleeFromY: undefined,
     _fleeDistLeft: 0,
   };
 
-  base.size = (opts.size ?? base.birthSize);
-  base.senseRadius = base.senseGene * 20;
-  base.shiny = maybeShiny(base.rarityGene);
-  if(opts.override) Object.assign(base, opts.override);
+  base.size = opts.size ?? base.birthSize;
+  base.senseRadius = (base.senseGene || 0) * 20;
+  base.shiny = maybeShiny(base.rarityGene || 0);
+  if (opts.override) Object.assign(base, opts.override);
 
-  if (base.birthSize > base.maxSize - 1) base.birthSize = Math.max(SIZE_GENE.BIRTH_MIN, Math.min(base.maxSize - 1, base.birthSize));
-  if (base.size < base.birthSize) base.size = base.birthSize;
+  if (typeof base.birthSize === 'number' && typeof base.maxSize === 'number') {
+    if (base.birthSize > base.maxSize - 1) {
+      base.birthSize = Math.max(SIZE_GENE.BIRTH_MIN, Math.min(base.maxSize - 1, base.birthSize));
+    }
+    if (typeof base.size === 'number' && base.size < base.birthSize) {
+      base.size = base.birthSize;
+    }
+  }
 
-  base._maxAge = computeMaxAgeSeconds(typeof base.constitution === 'number' ? base.constitution : 5);
+  base._maxAge = computeMaxAgeSeconds(
+    typeof base.constitution === 'number' ? base.constitution : 5
+  );
 
   trackDiscovery(base);
   return base;
 }
 
 /* ---------- spawn near mom's tail ---------- */
-function tailSpawnPosition(mom){
+function tailSpawnPosition(mom: FishEntity) {
   console.log(`FIXME: tailSpawnPosition mom:`, mom);
-  const { W, H } = viewportSize;
-  const bodyLen = clamp(mom.size * 2.2, 16, 140);
-  const tailL = bodyLen*0.40;
+  const { W, H } = syncViewportSize();
+  const size = typeof mom.size === 'number' ? mom.size : 0;
+  const bodyLen = clamp(size * 2.2, 16, 140);
+  const tailL = bodyLen * 0.4;
   const localTailX = -bodyLen * 0.5 - tailL * 0.75;
-  const cos = Math.cos(mom.dir), sin = Math.sin(mom.dir);
+  const cos = Math.cos(mom.dir),
+    sin = Math.sin(mom.dir);
   let sx = mom.x + localTailX * cos;
   let sy = mom.y + localTailX * sin;
   sx = clamp(sx, 10, W - 10);
@@ -309,30 +388,33 @@ function tailSpawnPosition(mom){
 }
 
 export function breed(a, b) {
-   
   const mom = a.sex === 'F' ? a : b;
   const babies = [];
   const spawn = tailSpawnPosition(mom);
 
   // Calculate mutation chance based on parents' average rarity (0-9%)
   const mutationChance = (a.rarityGene + b.rarityGene) / 200; // Convert to 0-0.09 range
-  
+
   for (let i = 0; i < 3; i++) {
     // inherit existing genes with rarity-based mutation chance
-    const speed        = mutateNum(inheritNum(a.speed, b.speed), mutationChance);
-    const senseGene    = mutateNum(inheritNum(a.senseGene ?? 5, b.senseGene ?? 5), mutationChance);
-    const hungerDrive  = mutateNum(inheritNum(a.hungerDrive, b.hungerDrive), mutationChance);
-    const rarityGene   = mutateNum(inheritNum(a.rarityGene, b.rarityGene), mutationChance);
-    const colorHue     = mutateHue(inheritNum(a.colorHue, b.colorHue), mutationChance);
-    const patternType  = inheritList(a.patternType, b.patternType);
-    const finShape     = inheritList(a.finShape, b.finShape);
-    const eyeType      = inheritList(a.eyeType, b.eyeType);
+    const speed = mutateNum(inheritNum(a.speed, b.speed), mutationChance);
+    const senseGene = mutateNum(inheritNum(a.senseGene ?? 5, b.senseGene ?? 5), mutationChance);
+    const hungerDrive = mutateNum(inheritNum(a.hungerDrive, b.hungerDrive), mutationChance);
+    const rarityGene = mutateNum(inheritNum(a.rarityGene, b.rarityGene), mutationChance);
+    const colorHue = mutateHue(inheritNum(a.colorHue, b.colorHue), mutationChance);
+    const patternType = inheritList(a.patternType, b.patternType);
+    const finShape = inheritList(a.finShape, b.finShape);
+    const eyeType = inheritList(a.eyeType, b.eyeType);
 
     // new heritable genes with rarity-based mutation chance
-    const constitution = mutateNum(inheritNum(a.constitution ?? 5, b.constitution ?? 5), mutationChance);
-    let birthSize      = inheritBirthSize(a.birthSize ?? 2, b.birthSize ?? 2);
-    let maxSize        = inheritMaxSize(a.maxSize ?? 30, b.maxSize ?? 30);
-    if (birthSize > maxSize - 1) birthSize = Math.max(SIZE_GENE.BIRTH_MIN, Math.min(maxSize - 1, birthSize));
+    const constitution = mutateNum(
+      inheritNum(a.constitution ?? 5, b.constitution ?? 5),
+      mutationChance
+    );
+    let birthSize = inheritBirthSize(a.birthSize ?? 2, b.birthSize ?? 2);
+    const maxSize = inheritMaxSize(a.maxSize ?? 30, b.maxSize ?? 30);
+    if (birthSize > maxSize - 1)
+      birthSize = Math.max(SIZE_GENE.BIRTH_MIN, Math.min(maxSize - 1, birthSize));
 
     // direction fan
     const awayAngle = mom.dir + rand(-0.5, 0.5);
@@ -345,19 +427,31 @@ export function breed(a, b) {
       parents: { ma: a.id, pa: b.id },
       initialFish: false,
       override: {
-        speed, senseGene, hungerDrive, rarityGene,
-        colorHue, patternType, finShape, eyeType,
-        constitution, birthSize, maxSize,
+        speed,
+        senseGene,
+        hungerDrive,
+        rarityGene,
+        colorHue,
+        patternType,
+        finShape,
+        eyeType,
+        constitution,
+        birthSize,
+        maxSize,
 
         name: 'Unnamed',
-        x: spawn.x, y: spawn.y,
-        vx: 0, vy: 0,
+        x: spawn.x,
+        y: spawn.y,
+        vx: 0,
+        vy: 0,
         dir: awayAngle,
         freezeFor: 15,
         _spawnY0: spawn.y,
         _spawnYOffset: ySpread,
-        _nbBirthX: spawn.x, _nbBirthY: spawn.y,
-        _nbDirX: nbDirX, _nbDirY: nbDirY,
+        _nbBirthX: spawn.x,
+        _nbBirthY: spawn.y,
+        _nbDirX: nbDirX,
+        _nbDirY: nbDirY,
         _nbPhase: rand(0, Math.PI * 2),
       },
     });
@@ -368,7 +462,7 @@ export function breed(a, b) {
     }
     console.log(`FIXME: About to babies.push(f):`, f);
     babies.push(f);
-    
+
     // Play yippie sound for the first baby only, at half volume
     if (i === 0) {
       playSound(YIPPIE_SOUND, { volume: 0.5 });
@@ -383,14 +477,14 @@ export function breed(a, b) {
     ...currentState,
     progress: {
       ...currentState.progress,
-      generation: currentGen + 1
-    }
+      generation: currentGen + 1,
+    },
   });
   return babies;
 }
 
-export function trackDiscovery(f) { 
-  const key = `${f.patternType}-${f.finShape}`; 
+export function trackDiscovery(f) {
+  const key = `${f.patternType}-${f.finShape}`;
   const currentState = gameState.getState();
   const discovered = new Set(currentState.progress.discovered || []);
   if (!discovered.has(key)) {
@@ -399,15 +493,22 @@ export function trackDiscovery(f) {
       ...currentState,
       progress: {
         ...currentState.progress,
-        discovered: Array.from(discovered)
-      }
+        discovered: Array.from(discovered),
+      },
     });
   }
 }
 
 // Adult = ready to breed: age AND size thresholds
-export function isAdult(f){ return f.age >= BREED.MIN_AGE_SEC && f.size >= f.maxSize * BREED.MIN_SIZE_FRAC; }
-export function isYoung(f){ return f.age < BREED.MIN_AGE_SEC; }
+export function isAdult(f: FishEntity) {
+  if (typeof f.age !== 'number' || typeof f.size !== 'number' || typeof f.maxSize !== 'number') {
+    return false;
+  }
+  return f.age >= BREED.MIN_AGE_SEC && f.size >= f.maxSize * BREED.MIN_SIZE_FRAC;
+}
+export function isYoung(f: FishEntity) {
+  return typeof f.age === 'number' ? f.age < BREED.MIN_AGE_SEC : false;
+}
 
 export function pickFish(x: number, y: number) {
   for (let i = fish.length - 1; i >= 0; i--) {
@@ -425,7 +526,7 @@ export function pickFish(x: number, y: number) {
  * @param {boolean} [forceUpdate=false] - Whether to force an update even if values haven't changed
  */
 interface FishUpdate {
-  [key: string]: any;
+  [key: string]: unknown;
   size?: number;
   health?: number;
   lastUpdated?: string;
@@ -438,26 +539,31 @@ interface FishUpdate {
  * @param {boolean} [forceUpdate=false] - Whether to force an update even if values haven't changed
  */
 async function updateFishProperties(
-  fish: any, 
-  updates: FishUpdate, 
+  fish: FishEntity,
+  updates: FishUpdate,
   forceUpdate: boolean = false
 ): Promise<boolean> {
   if (!fish) return false;
-  
+
   // Check if this is a size update that would be visible in the collection
   const isSizeUpdate = 'size' in updates && fish.size !== updates.size;
-  
+
   // Apply updates to the fish
   Object.assign(fish, updates);
-  
+
   // If this fish is from the collection, update it there too
   if (fish.originalId) {
     // Don't debounce if this is a size update or forced
     const now = Date.now();
-    if (forceUpdate || isSizeUpdate || !fish._lastUpdateTime || now - (fish._lastUpdateTime as number) > 2000) {
-      await updateFishInCollection(fish);
+    if (
+      forceUpdate ||
+      isSizeUpdate ||
+      !fish._lastUpdateTime ||
+      now - (fish._lastUpdateTime as number) > 2000
+    ) {
+      await updateFishInCollection(fish as FishEntity);
       fish._lastUpdateTime = now;
-      
+
       // If this is a size update and the collection is open, refresh it
       if (isSizeUpdate || forceUpdate) {
         try {
@@ -472,51 +578,51 @@ async function updateFishProperties(
       }
     }
   }
-  
+
   return true;
 }
 
 // Function to update fish in the collection
 async function updateFishInCollection(updatedFish) {
   if (!updatedFish.originalId) return; // Skip if not from collection
-  
+
   try {
     // Dynamically import FishCollection to avoid circular dependencies
     const { fishCollection } = await import('../ui/FishCollection');
-    
+
     // Get current saved fish
     const savedFish = fishCollection.getSavedFish();
     const fishIndex = savedFish.findIndex(fish => fish.id === updatedFish.originalId);
-    
+
     if (fishIndex !== -1) {
       // Get current time for the update timestamp
       const now = new Date().toISOString();
-      
+
       // Track if this is a size increase
       const isGrowing = updatedFish.size > (savedFish[fishIndex].fishData.size || 0);
-      
+
       // Create updated fish data with all current properties
       const updatedData = {
         ...savedFish[fishIndex],
         lastUpdated: now,
         fishData: {
           ...savedFish[fishIndex].fishData, // Keep all existing data
-          ...updatedFish,                   // Override with updated properties
+          ...updatedFish, // Override with updated properties
           id: savedFish[fishIndex].fishData.id, // Preserve original ID
           originalId: savedFish[fishIndex].fishData.originalId, // Preserve originalId
-          lastGrew: isGrowing ? now : (savedFish[fishIndex].fishData.lastGrew || now),
-          lastUpdated: now
-        }
+          lastGrew: isGrowing ? now : savedFish[fishIndex].fishData.lastGrew || now,
+          lastUpdated: now,
+        },
       };
-      
+
       // Check if there are actual changes
       const hasChanges = JSON.stringify(savedFish[fishIndex]) !== JSON.stringify(updatedData);
-      
+
       if (hasChanges) {
         // Update the in-memory fish collection
         savedFish[fishIndex] = updatedData;
         gameState.updateState({ fishCollection: savedFish });
-        
+
         // Force refresh the collection view if it's open
         if (fishCollection.isVisible()) {
           // FIXME: fishCollection.refreshCollection();
@@ -528,39 +634,43 @@ async function updateFishInCollection(updatedFish) {
   }
 }
 
-export async function updateFish(f, dt){
-  const { W, H } = viewportSize;
+export async function updateFish(f, dt) {
+  const { W, H } = syncViewportSize();
   // const pellets = gameState.getState().pellets;  // TODO: Re-enable when pellets are properly managed
-  
+
   // Update eating cooldown timer
   if (f._eatCd > 0) {
     f._eatCd = Math.max(0, f._eatCd - dt);
   }
-  
+
   // Store previous size to detect changes
   const prevSize = f.size;
 
   if (f._maxAge == null) {
     await updateFishProperties(f, {
-      _maxAge: computeMaxAgeSeconds(typeof f.constitution === 'number' ? f.constitution : 5)
+      _maxAge: computeMaxAgeSeconds(typeof f.constitution === 'number' ? f.constitution : 5),
     });
   }
-  
+
   // Update age
   f.age += dt;
-  
+
   // Check if fish stats have changed significantly and need to be saved
   if (f.originalId && (f.size !== prevSize || f.health <= 0)) {
-    await updateFishProperties(f, {
-      size: f.size,
-      health: f.health,
-      lastUpdated: new Date().toISOString()
-    }, true);
+    await updateFishProperties(
+      f,
+      {
+        size: f.size,
+        health: f.health,
+        lastUpdated: new Date().toISOString(),
+      },
+      true
+    );
   }
 
   /* ---- corpse float + despawn early return ---- */
   if (isCorpse(f)) {
-    f.y += (-LIFE.RISE_SPEED) * dt;
+    f.y += -LIFE.RISE_SPEED * dt;
     if ((f._corpseArea !== undefined && f._corpseArea <= 0) || f.y < LIFE.OFF_Y) {
       // Fire and forget - we don't need to await this
       removeFish(f.id).catch(console.error);
@@ -574,19 +684,33 @@ export async function updateFish(f, dt){
   const SPEED = {
     BASE_OFFSET: 20,
     GENE_SCALE: 10,
-    MULTIPLIERS: { wander: 1.00, seekFood: 1.30, seekMate: 1.15, ritual: 0.60, flee: 1.60 },
+    MULTIPLIERS: { wander: 1.0, seekFood: 1.3, seekMate: 1.15, ritual: 0.6, flee: 1.6 },
   };
-  const SEEK = { BASE: 0.15, MATE: 0.17, FOOD: 0.20 };
+  const SEEK = { BASE: 0.15, MATE: 0.17, FOOD: 0.2 };
   const TURN = {
-    ALIGN:   { wander: 0.04, seekFood: 0.22, seekFoodTurbo: 0.38, seekMate: 0.14, ritual: 0.08, flee: 0.35 },
-    UY_BIAS: { wander: 0.6,  seekFood: 0.85, seekFoodTurbo: 1.0,  seekMate: 0.7,  ritual: 0.5,  flee: 1.0 }
+    ALIGN: {
+      wander: 0.04,
+      seekFood: 0.22,
+      seekFoodTurbo: 0.38,
+      seekMate: 0.14,
+      ritual: 0.08,
+      flee: 0.35,
+    },
+    UY_BIAS: {
+      wander: 0.6,
+      seekFood: 0.85,
+      seekFoodTurbo: 1.0,
+      seekMate: 0.7,
+      ritual: 0.5,
+      flee: 1.0,
+    },
   };
   const TURBO = { FOOD_DIST: 15, FOOD_MULT: 2.5 };
   const EPS = 1e-3;
   const NEWBORN = {
-    DRIFT_SLOW_FACTOR: 0.10,
+    DRIFT_SLOW_FACTOR: 0.1,
     TARGET_AWAY_DISTANCE: 80,
-    SEEK_FACTOR: 0.10,
+    SEEK_FACTOR: 0.1,
     WOBBLE_FREQ: 3,
     WOBBLE_AMPLITUDE: 0.5,
     Y_EASE_DURATION: 0.6,
@@ -597,7 +721,11 @@ export async function updateFish(f, dt){
 
   /* ---- newborn slow-drift ---- */
   if (f.freezeFor && f.age < f.freezeFor) {
-    if (f.drag) { f.vx = 0; f.vy = 0; return; }
+    if (f.drag) {
+      f.vx = 0;
+      f.vy = 0;
+      return;
+    }
 
     const baseSpeed = 20 + f.speed * 10;
     const slow = NEWBORN.DRIFT_SLOW_FACTOR;
@@ -605,35 +733,57 @@ export async function updateFish(f, dt){
     if (typeof f._nbBirthX === 'number' && typeof f._nbDirX === 'number') {
       const targetX = f._nbBirthX + f._nbDirX * NEWBORN.TARGET_AWAY_DISTANCE;
       const targetY = f._nbBirthY + f._nbDirY * NEWBORN.TARGET_AWAY_DISTANCE;
-      const dx = targetX - f.x, dy = targetY - f.y;
+      const dx = targetX - f.x,
+        dy = targetY - f.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 0) {
         f.vx += (dx / dist) * f.speed * NEWBORN.SEEK_FACTOR * slow;
         f.vy += (dy / dist) * f.speed * NEWBORN.SEEK_FACTOR * slow;
       }
-      const px = -f._nbDirY, py = f._nbDirX;
-      const wobble = Math.sin(f.age * NEWBORN.WOBBLE_FREQ + (f._nbPhase || 0)) * NEWBORN.WOBBLE_AMPLITUDE;
-      f.vx += px * wobble; f.vy += py * wobble;
+      const px = -f._nbDirY,
+        py = f._nbDirX;
+      const wobble =
+        Math.sin(f.age * NEWBORN.WOBBLE_FREQ + (f._nbPhase || 0)) * NEWBORN.WOBBLE_AMPLITUDE;
+      f.vx += px * wobble;
+      f.vy += py * wobble;
     }
 
     if (typeof f._spawnY0 === 'number' && typeof f._spawnYOffset === 'number') {
       const easeDur = Math.min(NEWBORN.Y_EASE_DURATION, f.freezeFor);
       const t = Math.min(f.age / easeDur, 1);
       const ease = 1 - Math.pow(1 - t, 2);
-      f.y = clamp(f._spawnY0 + f._spawnYOffset * ease, NEWBORN.BOUNDS_PAD, H - NEWBORN.BOUNDS_PAD);
+      const minY = Math.max(topInset, NEWBORN.BOUNDS_PAD);
+      f.y = clamp(f._spawnY0 + f._spawnYOffset * ease, minY, H - NEWBORN.BOUNDS_PAD);
     }
 
-    const vmax = (baseSpeed * NEWBORN.VMAX_MULT) * slow;
+    const vmax = baseSpeed * NEWBORN.VMAX_MULT * slow;
     const v = Math.hypot(f.vx, f.vy);
-    if (v > vmax) { f.vx *= vmax / v; f.vy *= vmax / v; }
+    if (v > vmax) {
+      f.vx *= vmax / v;
+      f.vy *= vmax / v;
+    }
 
     f.vy *= NEWBORN.DAMPING_Y;
-    f.x += f.vx * dt; f.y += f.vy * dt;
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
 
-    if (f.x < NEWBORN.BOUNDS_PAD) { f.x = NEWBORN.BOUNDS_PAD; f.vx = Math.abs(f.vx); }
-    if (f.x > W - NEWBORN.BOUNDS_PAD) { f.x = W - NEWBORN.BOUNDS_PAD; f.vx = -Math.abs(f.vx); }
-    if (f.y < NEWBORN.BOUNDS_PAD) { f.y = NEWBORN.BOUNDS_PAD; f.vy = Math.abs(f.vy); }
-    if (f.y > H - NEWBORN.BOUNDS_PAD) { f.y = H - NEWBORN.BOUNDS_PAD; f.vy = -Math.abs(f.vy); }
+    if (f.x < NEWBORN.BOUNDS_PAD) {
+      f.x = NEWBORN.BOUNDS_PAD;
+      f.vx = Math.abs(f.vx);
+    }
+    if (f.x > W - NEWBORN.BOUNDS_PAD) {
+      f.x = W - NEWBORN.BOUNDS_PAD;
+      f.vx = -Math.abs(f.vx);
+    }
+    const minY = Math.max(topInset, NEWBORN.BOUNDS_PAD);
+    if (f.y < minY) {
+      f.y = minY;
+      f.vy = Math.abs(f.vy);
+    }
+    if (f.y > H - NEWBORN.BOUNDS_PAD) {
+      f.y = H - NEWBORN.BOUNDS_PAD;
+      f.vy = -Math.abs(f.vy);
+    }
 
     f.dir = Math.atan2(f.vy, f.vx);
     if (f._breedCd > 0) f._breedCd -= dt;
@@ -642,9 +792,15 @@ export async function updateFish(f, dt){
     f.freezeFor = 0;
     if ('_spawnY0' in f) delete f._spawnY0;
     if ('_spawnYOffset' in f) delete f._spawnYOffset;
-    if ('_nbBirthX' in f) { delete f._nbBirthX; delete f._nbBirthY; }
-    if ('_nbDirX' in f)   { delete f._nbDirX;   delete f._nbDirY; }
-    if ('_nbPhase' in f)  delete f._nbPhase;
+    if ('_nbBirthX' in f) {
+      delete f._nbBirthX;
+      delete f._nbBirthY;
+    }
+    if ('_nbDirX' in f) {
+      delete f._nbDirX;
+      delete f._nbDirY;
+    }
+    if ('_nbPhase' in f) delete f._nbPhase;
   }
 
   /* ---- death trigger (now works for young & adult if not favorite) ---- */
@@ -662,31 +818,33 @@ export async function updateFish(f, dt){
     const ax = f.x - (f._fleeFromX ?? f.x);
     const ay = f.y - (f._fleeFromY ?? f.y);
     const alen = Math.hypot(ax, ay) || 1;
-    target = { x: f.x + (ax/alen)*200, y: f.y + (ay/alen)*200 };
-  } else  // Handle ritual state and timer
-  if (f._mateId && f.state === 'ritual') {
+    target = { x: f.x + (ax / alen) * 200, y: f.y + (ay / alen) * 200 };
+  } else if (f._mateId && f.state === 'ritual') {
+    // Handle ritual state and timer
     const tankFish = fish;
-    const partner = tankFish.find((m: any) => m.id === f._mateId);
-    
+    const partner = tankFish.find((m: FishEntity) => m.id === f._mateId);
+
     // Clean up if partner is gone, dead, or no longer paired with us
     if (!partner || partner.dead || partner._mateId !== f.id) {
       console.log(`Ritual aborted: partner invalid for fish ${f.id}`);
       f._mateId = null;
       f._ritualTimer = 0;
       f.state = 'wander';
-    } 
+    }
     // Check if fish have been pulled too far apart
     else if (partner) {
       const distance = Math.hypot(partner.x - f.x, partner.y - f.y);
       const maxRitualDistance = Math.max(f.size, partner.size) * 3; // 3x size seems reasonable
-      
+
       if (distance > maxRitualDistance) {
-        console.log(`Ritual aborted: fish ${f.id} and ${partner.id} too far apart (${distance.toFixed(1)}px)`);
+        console.log(
+          `Ritual aborted: fish ${f.id} and ${partner.id} too far apart (${distance.toFixed(1)}px)`
+        );
         // Reset both fish
         f._mateId = null;
         f._ritualTimer = 0;
         f.state = 'wander';
-        
+
         partner._mateId = null;
         partner._ritualTimer = 0;
         partner.state = 'wander';
@@ -696,14 +854,15 @@ export async function updateFish(f, dt){
         f._ritualTimer -= dt;
         f.state = 'ritual';
         target = partner;
-        
+
         // Make fish face each other during ritual
         const dx = partner.x - f.x;
         const dy = partner.y - f.y;
         f.dir = Math.atan2(dy, dx);
-        
+
         // Force completion if ritual takes too long (safety net)
-        if (f._ritualTimer < -5) {  // 5 seconds grace period after timer hits 0
+        if (f._ritualTimer < -5) {
+          // 5 seconds grace period after timer hits 0
           console.log(`Forcing ritual completion for fish ${f.id} (took too long)`);
           f._ritualTimer = 0;
         }
@@ -713,34 +872,57 @@ export async function updateFish(f, dt){
 
   if (!target) {
     // consider pellets and corpses as food - but only if not on eating cooldown
-    let bestFood = null, bestFoodDist = Infinity;
-    const senseRadius = f.senseGene * 20; // Convert gene to pixels (0-180)
+    let bestFood = null,
+      bestFoodDist = Infinity;
     // const eff = f.senseGene * (0.9 + 0.7 * (f.hungerDrive/9));
     const eff = f._eatCd <= 0 ? f.senseGene * (f.hungerDrive * 2.1) + 5 : 0; // Set effective range to 0 if on cooldown
     for (const p of pellets) {
       const d = Math.hypot(p.x - f.x, p.y - f.y);
-      if (d < eff && d < bestFoodDist) { bestFood = p; bestFoodDist = d; }
+      if (d < eff && d < bestFoodDist) {
+        bestFood = p;
+        bestFoodDist = d;
+      }
     }
-    let bestCorpse = null, bestCorpseDist = Infinity;
+    let bestCorpse = null,
+      bestCorpseDist = Infinity;
     const tankFish = fish;
     for (const c of tankFish) {
       if (c === f) continue;
       if (!c.dead) continue;
       if (c._corpseArea !== undefined && c._corpseArea <= 0) continue;
       const d = Math.hypot(c.x - f.x, c.y - f.y);
-      if (d < eff && d < bestCorpseDist) { bestCorpse = c; bestCorpseDist = d; }
+      if (d < eff && d < bestCorpseDist) {
+        bestCorpse = c;
+        bestCorpseDist = d;
+      }
     }
     let foodTarget = null;
     if (bestFood && (!bestCorpse || bestFoodDist <= bestCorpseDist)) foodTarget = bestFood;
     else if (bestCorpse) foodTarget = bestCorpse;
 
     // mate desire (exclude dead, only adults, no cooldown, not already in ritual)
-    let bestMate = null, bestMateDist = f.senseGene * 20;
+    let bestMate = null,
+      bestMateDist = f.senseGene * 20;
     const MAX_FISH_BASE = 60;
     const canSeekMate = tankFish.length < MAX_FISH_BASE;
-    if (canSeekMate && isAdult(f) && f._breedCd <= 0 && !f._mateId && f._eatCd <= 0 && f.canMate !== false) {
+    if (f._mateId) {
+      const currentMate = tankFish.find(m => m.id === f._mateId);
+      if (!currentMate || currentMate.dead || currentMate._mateId !== f.id) {
+        f._mateId = null;
+        f.state = 'wander';
+      }
+    }
+    if (
+      canSeekMate &&
+      isAdult(f) &&
+      f._breedCd <= 0 &&
+      !f._mateId &&
+      f._eatCd <= 0 &&
+      f.canMate !== false
+    ) {
       for (const m of tankFish) {
         if (m === f) continue;
+        if (!((f.sex === 'M' && m.sex === 'F') || (f.sex === 'F' && m.sex === 'M'))) continue;
         if (!isAdult(m)) continue;
         if (m._breedCd > 0) continue;
         if (m._mateId) continue;
@@ -748,15 +930,25 @@ export async function updateFish(f, dt){
         if (m.canMate === false) continue;
         const d = Math.hypot(m.x - f.x, m.y - f.y);
         const senseRadius = f.senseGene * 20; // Convert gene to pixels (0-180)
-        if (d < senseRadius && d < bestMateDist) { bestMate = m; bestMateDist = d; }
+        if (d < senseRadius && d < bestMateDist) {
+          bestMate = m;
+          bestMateDist = d;
+        }
       }
     }
 
     if (f._eatCd <= 0) {
-      if (bestMate && (!foodTarget || bestMateDist < (foodTarget===bestFood?bestFoodDist:bestCorpseDist) * 0.8 || Math.random() < 0.3)) {
-        f.state = 'seekMate'; target = bestMate;
+      if (
+        bestMate &&
+        (!foodTarget ||
+          bestMateDist < (foodTarget === bestFood ? bestFoodDist : bestCorpseDist) * 0.8 ||
+          Math.random() < 0.3)
+      ) {
+        f.state = 'seekMate';
+        target = bestMate;
       } else if (foodTarget) {
-        f.state = 'seekFood'; target = foodTarget;
+        f.state = 'seekFood';
+        target = foodTarget;
       } else {
         f.state = 'wander';
       }
@@ -768,16 +960,20 @@ export async function updateFish(f, dt){
 
   // decor influences
   let speedBoost = 1;
-  if(nearDecorType(f.x,f.y,'plant',60)) speedBoost += 0.2;
-  if(nearDecorType(f.x,f.y,'rock',60) && !isAdult(f)) speedBoost -= 0.2;
+  if (nearDecorType(f.x, f.y, 'plant', 60)) speedBoost += 0.2;
+  if (nearDecorType(f.x, f.y, 'rock', 60) && !isAdult(f)) speedBoost -= 0.2;
 
   // movement (state-aware + snappy turns near food)
   const stateMult =
-    f.state === 'seekMate' ? SPEED.MULTIPLIERS.seekMate :
-    f.state === 'seekFood' ? SPEED.MULTIPLIERS.seekFood :
-    f.state === 'ritual'   ? SPEED.MULTIPLIERS.ritual   :
-    f.state === 'flee'     ? SPEED.MULTIPLIERS.flee     :
-                             SPEED.MULTIPLIERS.wander;
+    f.state === 'seekMate'
+      ? SPEED.MULTIPLIERS.seekMate
+      : f.state === 'seekFood'
+        ? SPEED.MULTIPLIERS.seekFood
+        : f.state === 'ritual'
+          ? SPEED.MULTIPLIERS.ritual
+          : f.state === 'flee'
+            ? SPEED.MULTIPLIERS.flee
+            : SPEED.MULTIPLIERS.wander;
 
   let baseSpeed = (SPEED.BASE_OFFSET + f.speed * SPEED.GENE_SCALE) * stateMult;
   let speedForClamp = baseSpeed;
@@ -785,9 +981,9 @@ export async function updateFish(f, dt){
   if (target) {
     const dx = target.x - f.x;
     const dy = target.y - f.y;
-    const d2 = dx*dx + dy*dy;
+    const d2 = dx * dx + dy * dy;
 
-    if (d2 > EPS*EPS) {
+    if (d2 > EPS * EPS) {
       const dist = Math.sqrt(d2);
       const ux = dx / dist;
       const uy = dy / dist;
@@ -797,28 +993,36 @@ export async function updateFish(f, dt){
 
       if (f.state === 'seekFood') {
         const turbo = dist <= TURBO.FOOD_DIST;
-        if (turbo) { baseSpeed *= TURBO.FOOD_MULT; speedForClamp = baseSpeed; }
+        if (turbo) {
+          baseSpeed *= TURBO.FOOD_MULT;
+          speedForClamp = baseSpeed;
+        }
         align = turbo ? TURN.ALIGN.seekFoodTurbo : TURN.ALIGN.seekFood;
         uyBias = turbo ? TURN.UY_BIAS.seekFoodTurbo : TURN.UY_BIAS.seekFood;
       } else if (f.state === 'seekMate') {
-        align = TURN.ALIGN.seekMate; uyBias = TURN.UY_BIAS.seekMate;
+        align = TURN.ALIGN.seekMate;
+        uyBias = TURN.UY_BIAS.seekMate;
       } else if (f.state === 'ritual') {
-        align = TURN.ALIGN.ritual;   uyBias = TURN.UY_BIAS.ritual;
+        align = TURN.ALIGN.ritual;
+        uyBias = TURN.UY_BIAS.ritual;
       } else if (f.state === 'flee') {
-        align = TURN.ALIGN.flee;     uyBias = TURN.UY_BIAS.flee;
+        align = TURN.ALIGN.flee;
+        uyBias = TURN.UY_BIAS.flee;
         f._fleeDistLeft -= Math.max(0, baseSpeed) * dt;
-        if (f._fleeDistLeft <= 0) { f._fleeDistLeft = 0; if (f.state==='flee') f.state = 'wander'; }
+        if (f._fleeDistLeft <= 0) {
+          f._fleeDistLeft = 0;
+          if (f.state === 'flee') f.state = 'wander';
+        }
       }
 
       const seekFactor =
-        f.state === 'seekMate' ? SEEK.MATE :
-        f.state === 'seekFood' ? SEEK.FOOD : SEEK.BASE;
+        f.state === 'seekMate' ? SEEK.MATE : f.state === 'seekFood' ? SEEK.FOOD : SEEK.BASE;
 
       f.vx += ux * f.speed * seekFactor;
       f.vy += uy * f.speed * seekFactor;
 
       f.vx += ux * baseSpeed * 0.9 * dt * speedBoost;
-      f.vy += (uy * uyBias) * baseSpeed * 0.9 * dt * speedBoost;
+      f.vy += uy * uyBias * baseSpeed * 0.9 * dt * speedBoost;
 
       const desired = baseSpeed * 0.9 * speedBoost;
       const desVX = ux * desired;
@@ -827,7 +1031,8 @@ export async function updateFish(f, dt){
       f.vy = f.vy * (1 - align) + desVY * align;
 
       if (f.state === 'ritual') {
-        const px = -uy, py = ux;
+        const px = -uy,
+          py = ux;
         const osc = Math.sin(f.age * 3 + (f.sex === 'F' ? 0 : Math.PI)) * 6;
         f.vx += px * osc * dt;
         f.vy += py * osc * dt;
@@ -841,39 +1046,57 @@ export async function updateFish(f, dt){
 
   const vmax = speedForClamp * 0.8 * speedBoost;
   const v = Math.hypot(f.vx, f.vy);
-  if (v > vmax) { f.vx *= vmax / v; f.vy *= vmax / v; }
-  if (!Number.isFinite(f.vx) || !Number.isFinite(f.vy)) { f.vx = 0; f.vy = 0; }
+  if (v > vmax) {
+    f.vx *= vmax / v;
+    f.vy *= vmax / v;
+  }
+  if (!Number.isFinite(f.vx) || !Number.isFinite(f.vy)) {
+    f.vx = 0;
+    f.vy = 0;
+  }
 
-  const dampingY =
-    f.state === 'seekFood' ? 0.98 :
-    f.state === 'seekMate' ? 0.95 : 0.90;
+  const dampingY = f.state === 'seekFood' ? 0.98 : f.state === 'seekMate' ? 0.95 : 0.9;
   f.vy *= dampingY;
-  f.x += f.vx * dt; f.y += f.vy * dt;
+  f.x += f.vx * dt;
+  f.y += f.vy * dt;
 
   // bounds
-  if(f.x < 10){ f.x=10; f.vx = Math.abs(f.vx); }
-  if(f.x > W-10){ f.x=W-10; f.vx = -Math.abs(f.vx); }
-  if(f.y < 10){ f.y=10; f.vy = Math.abs(f.vy); }
-  if(f.y > H-10){ f.y=H-10; f.vy = -Math.abs(f.vy); }
+  if (f.x < 10) {
+    f.x = 10;
+    f.vx = Math.abs(f.vx);
+  }
+  if (f.x > W - 10) {
+    f.x = W - 10;
+    f.vx = -Math.abs(f.vx);
+  }
+  const minY = Math.max(topInset, 10);
+  if (f.y < minY) {
+    f.y = minY;
+    f.vy = Math.abs(f.vy);
+  }
+  if (f.y > H - 10) {
+    f.y = H - 10;
+    f.vy = -Math.abs(f.vy);
+  }
 
   f.dir = Math.atan2(f.vy, f.vx);
 
   // eat pellets (skip during ritual/flee)
   if (f.state !== 'ritual' && f.state !== 'flee' && f._eatCd <= 0) {
-    for(let i=pellets.length-1;i>=0;i--){
+    for (let i = pellets.length - 1; i >= 0; i--) {
       const p = pellets[i];
-      if(Math.hypot(p.x-f.x,p.y-f.y) < Math.max(12,f.size*0.85)){
+      if (Math.hypot(p.x - f.x, p.y - f.y) < Math.max(12, f.size * 0.85)) {
         const newSize = Math.min(f.size + 2, f.maxSize);
         if (newSize > f.size) {
           f.size = newSize;
           f.health = Math.min(100, f.health + 10); // Restore some health when eating
         }
-        
+
         // Update hunger drive (inverse of hunger drive - higher drive means less cooldown)
         // Clamping hungerDrive between 0-9 to ensure cooldown is at least 1 second
         f._eatCd = Math.max(1, 10 - Math.min(9, Math.max(0, f.hungerDrive || 0)));
-        
-        pellets.splice(i,1);
+
+        pellets.splice(i, 1);
       }
     }
   }
@@ -886,20 +1109,22 @@ export async function updateFish(f, dt){
       if (!c.dead) continue;
       if (c._corpseArea !== undefined && c._corpseArea <= 0) continue;
       const dist = Math.hypot(c.x - f.x, c.y - f.y);
-      if (dist < Math.max(12, f.size*0.85)) {
+      if (dist < Math.max(12, f.size * 0.85)) {
         // bite point toward eater
-        const ux = (f.x - c.x) / (dist||1);
-        const uy = (f.y - c.y) / (dist||1);
-        const bodyLen = clamp(c.size*2.2, 16, 140);
-        const biteOffset = Math.min(bodyLen*0.25, 20);
+        const ux = (f.x - c.x) / (dist || 1);
+        const uy = (f.y - c.y) / (dist || 1);
+        const bodyLen = clamp(c.size * 2.2, 16, 140);
+        const biteOffset = Math.min(bodyLen * 0.25, 20);
         const bx = c.x + ux * biteOffset;
         const by = c.y + uy * biteOffset;
 
         // world → corpse local
-        const cos = Math.cos(c.dir), sin = Math.sin(c.dir);
-        const dxw = bx - c.x, dyw = by - c.y;
-        const lx =  cos*dxw + sin*dyw;
-        const ly = -sin*dxw + cos*dyw;
+        const cos = Math.cos(c.dir),
+          sin = Math.sin(c.dir);
+        const dxw = bx - c.x,
+          dyw = by - c.y;
+        const lx = cos * dxw + sin * dyw;
+        const ly = -sin * dxw + cos * dyw;
 
         if (!c._bites) c._bites = [];
         c._bites.push({ x: lx, y: ly, r: CORPSE.BITE_RADIUS });
@@ -912,17 +1137,18 @@ export async function updateFish(f, dt){
         const newSize = Math.min(f.size + CORPSE.BITE_GROWTH, f.maxSize);
         if (newSize > f.size) {
           updateFishProperties(f, {
-            size: newSize
+            size: newSize,
           });
-          
+
           // Set cooldown based on hungerDrive (10 - hungerDrive seconds)
           // Clamping hungerDrive between 0-9 to ensure cooldown is at least 1 second
           f._eatCd = Math.max(1, 10 - Math.min(9, Math.max(0, f.hungerDrive || 0)));
         }
 
         // flee away
-        f._fleeFromX = c.x; f._fleeFromY = c.y;
-        f._fleeDistLeft = (f.senseGene  * 20) / 2; // Convert gene to pixels
+        f._fleeFromX = c.x;
+        f._fleeFromY = c.y;
+        f._fleeDistLeft = (f.senseGene * 20) / 2; // Convert gene to pixels
         break;
       }
     }
@@ -932,90 +1158,92 @@ export async function updateFish(f, dt){
   if (f._breedCd > 0) {
     f._breedCd = Math.max(0, f._breedCd - dt);
   }
-  
+
   // Update ritual timer if in ritual state
   if (f.state === 'ritual' && f._ritualTimer > 0) {
     f._ritualTimer = Math.max(0, f._ritualTimer - dt);
   }
 
   // Debug logging for breeding state (only log occasionally to reduce noise)
-  if (f._mateId && Math.random() < 0.01) { // ~1% chance to log each frame
+  if (f._mateId && Math.random() < 0.01) {
+    // ~1% chance to log each frame
     const tankFish = fish;
-    const partner = tankFish.find((m: any) => m.id === f._mateId);
+    const partner = tankFish.find((m: FishEntity) => m.id === f._mateId);
     const distance = partner ? Math.hypot(partner.x - f.x, partner.y - f.y) : 0;
-    console.log(`Fish ${f.id} (${f.sex}) state: ${f.state}, ` +
-                `timer: ${f._ritualTimer?.toFixed(2)}, ` +
-                `mate: ${f._mateId} (${partner ? 'valid' : 'invalid'}), ` +
-                `distance: ${distance.toFixed(1)}px, ` +
-                `partner state: ${partner?.state}, ` +
-                `partner timer: ${partner?._ritualTimer?.toFixed(2)}`);
+    console.log(
+      `Fish ${f.id} (${f.sex}) state: ${f.state}, ` +
+        `timer: ${f._ritualTimer?.toFixed(2)}, ` +
+        `mate: ${f._mateId} (${partner ? 'valid' : 'invalid'}), ` +
+        `distance: ${distance.toFixed(1)}px, ` +
+        `partner state: ${partner?.state}, ` +
+        `partner timer: ${partner?._ritualTimer?.toFixed(2)}`
+    );
   }
 
   // ritual completion → spawn once + cooldown (then honor pending death)
   if (f.state === 'ritual' && f._mateId && f._ritualTimer <= 0) {
     const tankFish = fish;
-    const partner = tankFish.find((m: any) => m.id === f._mateId);
-    
+    const partner = tankFish.find((m: FishEntity) => m.id === f._mateId);
+
     // Only proceed if we have a valid partner and they're still paired with us
     if (partner && partner._mateId === f.id) {
       // If this is the male, switch to evaluating the female
       if (f.sex === 'male') {
         return; // Let the female handle the breeding logic
       }
-      
+
       console.log(`Attempting to breed fish ${f.id} (female) with ${partner.id} (male)`);
       // At this point we know f is female
       try {
         const babies = breed(f, partner);
         const tankFish = fish;
-        for(const nb of babies) {
+        for (const nb of babies) {
           tankFish.push(nb);
         }
         // Set cooldown for both parents
         // 60 second cooldown after successful breeding
         f._breedCd = 60;
         partner._breedCd = 60;
-        
       } catch (e) {
         console.error('Error during breeding:', e);
       }
-      
+
       // Clean up both fish states
-      f._mateId = null; 
-      f._ritualTimer = 0; 
+      f._mateId = null;
+      f._ritualTimer = 0;
       f.state = 'wander';
-      
+
       if (partner) {
-        partner._mateId = null; 
-        partner._ritualTimer = 0; 
+        partner._mateId = null;
+        partner._ritualTimer = 0;
         partner.state = 'wander';
       }
-      
+
       // Handle any pending deaths
       if (f._dieAfterRitual) killFish(f);
       if (partner?._dieAfterRitual) killFish(partner);
     } else {
       // Clean up if partner is no longer valid
-      f._mateId = null; 
-      f._ritualTimer = 0; 
+      f._mateId = null;
+      f._ritualTimer = 0;
       f.state = 'wander';
     }
   }
 }
 
 /* ---------------- start ritual (proximity) ---------------- */
-export function handleBreeding(_dt){
+export function handleBreeding(_dt) {
   // Skip mating if tank is at or over capacity
   const tankFish = fish;
   const MAX_FISH_BASE = 60; // From legacy runLegacyGame.ts
   if (tankFish.length >= MAX_FISH_BASE) return;
 
-  for(let i=0;i<tankFish.length;i++){
+  for (let i = 0; i < tankFish.length; i++) {
     const a = tankFish[i];
     // Skip if fish can't mate, isn't an adult, is dead, or already in a ritual
     if (!a.canMate || !isAdult(a) || a.dead || a.state === 'ritual') continue;
 
-    for(let j=i+1;j<tankFish.length;j++){
+    for (let j = i + 1; j < tankFish.length; j++) {
       const b = tankFish[j];
       // Skip if fish can't mate, isn't an adult, is dead, or already in a ritual
       if (!b.canMate || !isAdult(b) || b.dead || b.state === 'ritual') continue;
@@ -1028,16 +1256,17 @@ export function handleBreeding(_dt){
       // Check distance between fish (using their sensing radius)
       const senseRadius = (a.senseGene + b.senseGene) * 15; // Average sensing radius
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      
-      if (d < senseRadius * 0.8) { // Need to be within 80% of sensing range
+
+      if (d < senseRadius * 0.8) {
+        // Need to be within 80% of sensing range
         // Only start ritual if both fish are available
         if (!a._mateId && !b._mateId) {
           console.log(`Starting breeding ritual between ${a.id} and ${b.id}`);
-          a._mateId = b.id; 
+          a._mateId = b.id;
           b._mateId = a.id;
           a._ritualTimer = b._ritualTimer = 30; // 30 second ritual duration
           a.state = b.state = 'ritual';
-          
+
           // Make fish face each other
           const dx = b.x - a.x;
           const dy = b.y - a.y;
@@ -1050,48 +1279,91 @@ export function handleBreeding(_dt){
 }
 
 /* ---------------- rendering ---------------- */
-function drawDeadFishWithHoles(ctx:CanvasRenderingContext2D, f:any){
-  const bodyLen = clamp(f.size*2.2, 16, 140);
-  const bodyHt  = clamp(f.size*1.2, 10, 80);
+function drawDeadFishWithHoles(ctx: CanvasRenderingContext2D, f: FishEntity) {
+  const bodyLen = clamp(f.size * 2.2, 16, 140);
+  const bodyHt = clamp(f.size * 1.2, 10, 80);
 
   const pad = 12;
-  const ow = Math.ceil(bodyLen + pad*2);
-  const oh = Math.ceil(bodyHt  + pad*2);
+  const ow = Math.ceil(bodyLen + pad * 2);
+  const oh = Math.ceil(bodyHt + pad * 2);
 
   const off = document.createElement('canvas');
-  off.width = ow; off.height = oh;
+  off.width = ow;
+  off.height = oh;
   const octx = off.getContext('2d')!;
 
   octx.save();
-  octx.translate(ow/2, oh/2);
+  octx.translate(ow / 2, oh / 2);
 
   const lighter = `hsl(${f.colorHue} 80% 70%)`;
-  const base    = `hsl(${f.colorHue} 70% 55%)`;
-  const darker  = `hsl(${(f.colorHue+330)%360} 70% 35%)`;
+  const base = `hsl(${f.colorHue} 70% 55%)`;
+  const darker = `hsl(${(f.colorHue + 330) % 360} 70% 35%)`;
 
-  const tailW = f.finShape==='long'? bodyHt*0.9: f.finShape==='fan'? bodyHt*1.1: f.finShape==='pointy'? bodyHt*0.6: bodyHt*0.8;
-  const tailL = f.finShape==='long'? bodyLen*0.45: f.finShape==='fan'? bodyLen*0.35: f.finShape==='pointy'? bodyLen*0.4: bodyLen*0.3;
+  const tailW =
+    f.finShape === 'long'
+      ? bodyHt * 0.9
+      : f.finShape === 'fan'
+        ? bodyHt * 1.1
+        : f.finShape === 'pointy'
+          ? bodyHt * 0.6
+          : bodyHt * 0.8;
+  const tailL =
+    f.finShape === 'long'
+      ? bodyLen * 0.45
+      : f.finShape === 'fan'
+        ? bodyLen * 0.35
+        : f.finShape === 'pointy'
+          ? bodyLen * 0.4
+          : bodyLen * 0.3;
 
-  octx.fillStyle = lighter; octx.beginPath();
-  octx.moveTo(-bodyLen*0.5,0);
-  octx.quadraticCurveTo(-bodyLen*0.5-tailL*0.5, -tailW*0.2, -bodyLen*0.5-tailL, 0);
-  octx.quadraticCurveTo(-bodyLen*0.5-tailL*0.5, tailW*0.2, -bodyLen*0.5, 0); octx.fill();
+  octx.fillStyle = lighter;
+  octx.beginPath();
+  octx.moveTo(-bodyLen * 0.5, 0);
+  octx.quadraticCurveTo(-bodyLen * 0.5 - tailL * 0.5, -tailW * 0.2, -bodyLen * 0.5 - tailL, 0);
+  octx.quadraticCurveTo(-bodyLen * 0.5 - tailL * 0.5, tailW * 0.2, -bodyLen * 0.5, 0);
+  octx.fill();
 
-  const grd = octx.createLinearGradient(-bodyLen*0.5,0,bodyLen*0.5,0);
-  if(f.patternType==='solid'){ grd.addColorStop(0, base); grd.addColorStop(1, base); }
-  else if(f.patternType==='gradient'){ grd.addColorStop(0, base); grd.addColorStop(1, lighter); }
-  else if(f.patternType==='stripes'){ grd.addColorStop(0, base); grd.addColorStop(1, darker); }
-  else if(f.patternType==='spots'){ grd.addColorStop(0, lighter); grd.addColorStop(1, base); }
-  octx.fillStyle = grd; octx.beginPath(); octx.ellipse(0,0, bodyLen*0.5, bodyHt*0.5, 0, 0, Math.PI*2); octx.fill();
+  const grd = octx.createLinearGradient(-bodyLen * 0.5, 0, bodyLen * 0.5, 0);
+  if (f.patternType === 'solid') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, base);
+  } else if (f.patternType === 'gradient') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, lighter);
+  } else if (f.patternType === 'stripes') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, darker);
+  } else if (f.patternType === 'spots') {
+    grd.addColorStop(0, lighter);
+    grd.addColorStop(1, base);
+  }
+  octx.fillStyle = grd;
+  octx.beginPath();
+  octx.ellipse(0, 0, bodyLen * 0.5, bodyHt * 0.5, 0, 0, Math.PI * 2);
+  octx.fill();
 
-  if(f.patternType==='stripes'){
-    octx.globalAlpha = 0.25; octx.fillStyle = '#000';
-    for(let x=-bodyLen*0.4; x<bodyLen*0.5; x+= bodyLen*0.15){ octx.fillRect(x,-bodyHt*0.5, bodyLen*0.03, bodyHt); }
+  if (f.patternType === 'stripes') {
+    octx.globalAlpha = 0.25;
+    octx.fillStyle = '#000';
+    for (let x = -bodyLen * 0.4; x < bodyLen * 0.5; x += bodyLen * 0.15) {
+      octx.fillRect(x, -bodyHt * 0.5, bodyLen * 0.03, bodyHt);
+    }
     octx.globalAlpha = 1;
   }
-  if(f.patternType==='spots'){
-    octx.globalAlpha = 0.25; octx.fillStyle = '#000';
-    for(let s=0;s<6;s++){ octx.beginPath(); octx.arc(rand(-bodyLen*0.3,bodyLen*0.3), rand(-bodyHt*0.3,bodyHt*0.3), rand(2,4),0,Math.PI*2); octx.fill(); }
+  if (f.patternType === 'spots') {
+    octx.globalAlpha = 0.25;
+    octx.fillStyle = '#000';
+    for (let s = 0; s < 6; s++) {
+      octx.beginPath();
+      octx.arc(
+        rand(-bodyLen * 0.3, bodyLen * 0.3),
+        rand(-bodyHt * 0.3, bodyHt * 0.3),
+        rand(2, 4),
+        0,
+        Math.PI * 2
+      );
+      octx.fill();
+    }
     octx.globalAlpha = 1;
   }
 
@@ -1111,12 +1383,11 @@ function drawDeadFishWithHoles(ctx:CanvasRenderingContext2D, f:any){
   ctx.save();
   ctx.translate(f.x, f.y);
   ctx.rotate(f.dir);
-  ctx.drawImage(off, -ow/2, -oh/2);
+  ctx.drawImage(off, -ow / 2, -oh / 2);
   ctx.restore();
 }
 
-export function drawFish(f: any, ctx: CanvasRenderingContext2D) {
-
+export function drawFish(f: FishEntity, ctx: CanvasRenderingContext2D) {
   // Draw green circle around selected fish
   if (f.selected) {
     ctx.save();
@@ -1130,7 +1401,7 @@ export function drawFish(f: any, ctx: CanvasRenderingContext2D) {
     if (!f.dead) {
       ctx.globalAlpha = 0.5;
       ctx.beginPath();
-      const senseRadius = f.senseGene  * 20; // Convert gene to pixels (0-180)
+      const senseRadius = f.senseGene * 20; // Convert gene to pixels (0-180)
       ctx.arc(f.x, f.y, senseRadius, 0, Math.PI * 2);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
@@ -1151,250 +1422,298 @@ export function drawFish(f: any, ctx: CanvasRenderingContext2D) {
     ctx.restore();
   }
 
-  if (f.dead) { drawDeadFishWithHoles(ctx, f); return; }
+  if (f.dead) {
+    drawDeadFishWithHoles(ctx, f);
+    return;
+  }
 
-  ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(f.dir);
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.rotate(f.dir);
 
-  if(f.shiny){ ctx.shadowColor = `hsla(${f.colorHue}, 80%, 70%, 0.9)`; ctx.shadowBlur = 16; }
+  if (f.shiny) {
+    ctx.shadowColor = `hsla(${f.colorHue}, 80%, 70%, 0.9)`;
+    ctx.shadowBlur = 16;
+  }
 
-  const bodyLen = clamp(f.size*2.2, 16, 140);
-  const bodyHt  = clamp(f.size*1.2, 10, 80);
+  const bodyLen = clamp(f.size * 2.2, 16, 140);
+  const bodyHt = clamp(f.size * 1.2, 10, 80);
 
-  const base    = `hsl(${f.colorHue} 70% 55%)`;
-  const darker  = `hsl(${(f.colorHue+330)%360} 70% 35%)`;
+  const base = `hsl(${f.colorHue} 70% 55%)`;
+  const darker = `hsl(${(f.colorHue + 330) % 360} 70% 35%)`;
   const lighter = `hsl(${f.colorHue} 80% 70%)`;
 
   // tail (improved)
-drawBetterTail(ctx, f.finShape, bodyLen, bodyHt, lighter, darker);
+  drawBetterTail(ctx, f.finShape, bodyLen, bodyHt, lighter, darker);
 
-function drawBetterTail(
-  ctx: CanvasRenderingContext2D,
-  finShape: string,
-  bodyLen: number,
-  bodyHt: number,
-  lighter: string,
-  darker: string
-) {
-  // Start the tail slightly inside the body for a more natural look (0.45 instead of 0.5)
-  const sx = -bodyLen * 0.45; // tail root (starts inside the body on -X side)
+  function drawBetterTail(
+    ctx: CanvasRenderingContext2D,
+    finShape: string,
+    bodyLen: number,
+    bodyHt: number,
+    lighter: string,
+    darker: string
+  ) {
+    // Start the tail slightly inside the body for a more natural look (0.45 instead of 0.5)
+    const sx = -bodyLen * 0.45; // tail root (starts inside the body on -X side)
 
-  ctx.fillStyle = lighter;
-  ctx.strokeStyle = darker;
-  ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+    ctx.fillStyle = lighter;
+    ctx.strokeStyle = darker;
+    ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
 
-  switch (finShape) {
-    case "pointy": {
-      // Sleek, tapered diamond/leaf to a point
-      const L = bodyLen * 0.42;
-      const baseW = bodyHt * 0.4;  // 50% narrower at base (was 0.55, now 0.4 of body height)
-      const tipW = Math.max(1.5, bodyHt * 0.06);
-      const ex = sx - L;
+    switch (finShape) {
+      case 'pointy': {
+        // Sleek, tapered diamond/leaf to a point
+        const L = bodyLen * 0.42;
+        const baseW = bodyHt * 0.4; // 50% narrower at base (was 0.55, now 0.4 of body height)
+        const tipW = Math.max(1.5, bodyHt * 0.06);
+        const ex = sx - L;
 
-      ctx.beginPath();
-      ctx.moveTo(sx, -baseW * 0.5);
-      ctx.bezierCurveTo(
-        sx - L * 0.35, -baseW * 0.85,
-        ex - L * 0.05, -tipW,
-        ex, 0
-      );
-      ctx.bezierCurveTo(
-        ex - L * 0.05, tipW,
-        sx - L * 0.35, baseW * 0.85,
-        sx, baseW * 0.5
-      );
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      break;
-    }
+        ctx.beginPath();
+        ctx.moveTo(sx, -baseW * 0.5);
+        ctx.bezierCurveTo(sx - L * 0.35, -baseW * 0.85, ex - L * 0.05, -tipW, ex, 0);
+        ctx.bezierCurveTo(ex - L * 0.05, tipW, sx - L * 0.35, baseW * 0.85, sx, baseW * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
 
-    case "round": {
-      // Big, rounded and elongated tail
-      const L = bodyLen * 0.75;  // Increased length for a more elongated look
-      const baseW = bodyHt * 0.75;
-      const endW  = bodyHt * 1.15;  // Slightly wider at the end
-      const ex = sx - L;
+      case 'round': {
+        // Big, rounded and elongated tail
+        const L = bodyLen * 0.75; // Increased length for a more elongated look
+        const baseW = bodyHt * 0.75;
+        const endW = bodyHt * 1.15; // Slightly wider at the end
+        const ex = sx - L;
 
-      ctx.beginPath();
-      ctx.moveTo(sx, -baseW * 0.5);
-      // More pronounced curve for a rounder shape
-      ctx.bezierCurveTo(
-        sx - L * 0.6, -endW * 0.95,  // More pronounced curve
-        sx - L * 0.9, -endW * 0.7,   // Control point moved further out
-        ex, 0
-      );
-      // Matching curve on the bottom
-      ctx.bezierCurveTo(
-        sx - L * 0.9, endW * 0.7,    // Control point moved further out
-        sx - L * 0.6, endW * 0.95,   // More pronounced curve
-        sx, baseW * 0.5
-      );
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      break;
-    }
+        ctx.beginPath();
+        ctx.moveTo(sx, -baseW * 0.5);
+        // More pronounced curve for a rounder shape
+        ctx.bezierCurveTo(
+          sx - L * 0.6,
+          -endW * 0.95, // More pronounced curve
+          sx - L * 0.9,
+          -endW * 0.7, // Control point moved further out
+          ex,
+          0
+        );
+        // Matching curve on the bottom
+        ctx.bezierCurveTo(
+          sx - L * 0.9,
+          endW * 0.7, // Control point moved further out
+          sx - L * 0.6,
+          endW * 0.95, // More pronounced curve
+          sx,
+          baseW * 0.5
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
 
-    case "fan": {
-      // Wide, almost flat trailing edge with rounded corners
-      const L = bodyLen * 0.48;
-      const baseW = bodyHt * 0.5;
-      const endW  = bodyHt * 1.75;
-      const ex = sx - L;
-      const r = Math.min(12, L * 0.16); // corner radius
+      case 'fan': {
+        // Wide, almost flat trailing edge with rounded corners
+        const L = bodyLen * 0.48;
+        const baseW = bodyHt * 0.5;
+        const endW = bodyHt * 1.75;
+        const ex = sx - L;
+        const r = Math.min(12, L * 0.16); // corner radius
 
-      ctx.beginPath();
-      ctx.moveTo(sx, -baseW * 0.5);
-      ctx.lineTo(ex + r, -endW * 0.5);
-      ctx.quadraticCurveTo(ex, -endW * 0.5, ex, -endW * 0.5 + r);
-      ctx.lineTo(ex,  endW * 0.5 - r);
-      ctx.quadraticCurveTo(ex, endW * 0.5, ex + r, endW * 0.5);
-      ctx.lineTo(sx, baseW * 0.5);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      break;
-    }
+        ctx.beginPath();
+        ctx.moveTo(sx, -baseW * 0.5);
+        ctx.lineTo(ex + r, -endW * 0.5);
+        ctx.quadraticCurveTo(ex, -endW * 0.5, ex, -endW * 0.5 + r);
+        ctx.lineTo(ex, endW * 0.5 - r);
+        ctx.quadraticCurveTo(ex, endW * 0.5, ex + r, endW * 0.5);
+        ctx.lineTo(sx, baseW * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
 
-    case "forked": {
-      // Straighter, K-like angles with a notch; slightly asymmetric (shark-ish)
-      const L = bodyLen * 0.70;
-      const baseW = bodyHt * 0.5;
-      const lobeH = bodyHt * 1.15;
-      const ex = sx - L;
-      const notch = L * 0.45;      // 65% of tail length
-      const nx = ex + notch;
-      const top = -lobeH * 0.80;   // top lobe a bit longer
-      const bot =  lobeH * 0.25;   // bottom lobe shorter
+      case 'forked': {
+        // Straighter, K-like angles with a notch; slightly asymmetric (shark-ish)
+        const L = bodyLen * 0.7;
+        const baseW = bodyHt * 0.5;
+        const lobeH = bodyHt * 1.15;
+        const ex = sx - L;
+        const notch = L * 0.45; // 65% of tail length
+        const nx = ex + notch;
+        const top = -lobeH * 0.8; // top lobe a bit longer
+        const bot = lobeH * 0.25; // bottom lobe shorter
 
-      ctx.beginPath();
-      ctx.moveTo(sx, -baseW * 0.5);
-      ctx.lineTo(ex, top);
-      ctx.lineTo(nx, 0);
-      ctx.lineTo(ex, bot);
-      ctx.lineTo(sx,  baseW * 0.5);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      break;
-    }
+        ctx.beginPath();
+        ctx.moveTo(sx, -baseW * 0.5);
+        ctx.lineTo(ex, top);
+        ctx.lineTo(nx, 0);
+        ctx.lineTo(ex, bot);
+        ctx.lineTo(sx, baseW * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
 
-    case "lunate": {
-      // Attach point where tail meets body
-      const tailStartX = -bodyLen * 0.45;       // Match the inset used in other tails
-      const sx = tailStartX;
-      const peduncle = bodyHt * 0.36;           // base width (increased from 0.36 to 0.48 for thicker base)
-      const L = bodyLen * 0.72;                 // tail length
-    
-      // Crescent geometry: outer/inner arc centers and radii
-      const cxO = sx - L * 0.68;                // outer arc center (further left)
-      const cxI = cxO + L * 0.18;               //  28 inner arc center (pulled toward body for deeper “bite”)
-      const ROut = L * 0.80;                    // outer radius
-      const RIn  = L * 0.30;                    // inner radius  0.54
-      const phi  = Math.PI * 0.58;              // ~104° span; wider = more “C”
-    
-      // Wisp length (tip flourish)
-      const wisp = Math.min(L * 0.52, 22);      // the second  
-    
-      // Base anchors
-      const topBaseX = sx, topBaseY = -peduncle * 1.5;      // this  was 0.5
-      const botBaseX = sx, botBaseY =  peduncle * 0.1;
-    
-      // Arc endpoints at ±phi (top = -phi, bottom = +phi)
-      const pOutTopX = cxO + ROut * Math.cos(-phi);
-      const pOutTopY =            ROut * Math.sin(-phi);
-      const pOutBotX = cxO + ROut * Math.cos( phi);
-      const pOutBotY =            ROut * Math.sin( phi);
-    
-      const pInBotX  = cxI + RIn  * Math.cos( phi);
-      const pInBotY  =            RIn  * Math.sin( phi);
-      const pInTopX  = cxI + RIn  * Math.cos(-phi);
-      const pInTopY  =            RIn  * Math.sin(-phi);
-    
-      ctx.beginPath();
-    
-      // Ease from base top into the outer arc (no sharp corner)
-      ctx.moveTo(topBaseX, topBaseY);
-      ctx.quadraticCurveTo(
-        sx - L * 0.18, -peduncle * 1.1,   // soft lead-in
-        pOutTopX,      pOutTopY
-      );
-    
-      // OUTER arc: top → bottom (clockwise)
-      ctx.arc(cxO, 0, ROut, -phi, +phi, false);
-    
-      // Bottom wisp: overshoot then hook back to the inner rim
-      ctx.quadraticCurveTo(
-        pOutBotX - wisp, pOutBotY + wisp * 0.35,
-        pInBotX,         pInBotY
-      );
-    
-      // INNER arc: bottom → top (counter-clockwise)
-      ctx.arc(cxI, 0, RIn, +phi, -phi, true);
-    
-      // Top wisp: small hook outward, then back to base top
-      ctx.quadraticCurveTo(
-        pInTopX - wisp, pInTopY - wisp * 0.35,
-        topBaseX,       topBaseY
-      );
-    
-      // Close along the body side to give the root some thickness
-      ctx.lineTo(botBaseX, botBaseY);
-    
-      // Draw the outline
-      ctx.strokeStyle = darker;
-      ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
-      ctx.stroke();
-      
-      // Fill the shape
-      ctx.fill();
-      ctx.closePath();
-      break;
+      case 'lunate': {
+        // Attach point where tail meets body
+        const tailStartX = -bodyLen * 0.45; // Match the inset used in other tails
+        const sx = tailStartX;
+        const peduncle = bodyHt * 0.36; // base width (increased from 0.36 to 0.48 for thicker base)
+        const L = bodyLen * 0.72; // tail length
+
+        // Crescent geometry: outer/inner arc centers and radii
+        const cxO = sx - L * 0.68; // outer arc center (further left)
+        const cxI = cxO + L * 0.18; //  28 inner arc center (pulled toward body for deeper “bite”)
+        const ROut = L * 0.8; // outer radius
+        const RIn = L * 0.3; // inner radius  0.54
+        const phi = Math.PI * 0.58; // ~104° span; wider = more “C”
+
+        // Wisp length (tip flourish)
+        const wisp = Math.min(L * 0.52, 22); // the second
+
+        // Base anchors
+        const topBaseX = sx,
+          topBaseY = -peduncle * 1.5; // this  was 0.5
+        const botBaseX = sx,
+          botBaseY = peduncle * 0.1;
+
+        // Arc endpoints at ±phi (top = -phi, bottom = +phi)
+        const pOutTopX = cxO + ROut * Math.cos(-phi);
+        const pOutTopY = ROut * Math.sin(-phi);
+        const pOutBotX = cxO + ROut * Math.cos(phi);
+        const pOutBotY = ROut * Math.sin(phi);
+
+        const pInBotX = cxI + RIn * Math.cos(phi);
+        const pInBotY = RIn * Math.sin(phi);
+        const pInTopX = cxI + RIn * Math.cos(-phi);
+        const pInTopY = RIn * Math.sin(-phi);
+
+        ctx.beginPath();
+
+        // Ease from base top into the outer arc (no sharp corner)
+        ctx.moveTo(topBaseX, topBaseY);
+        ctx.quadraticCurveTo(
+          sx - L * 0.18,
+          -peduncle * 1.1, // soft lead-in
+          pOutTopX,
+          pOutTopY
+        );
+
+        // OUTER arc: top → bottom (clockwise)
+        ctx.arc(cxO, 0, ROut, -phi, +phi, false);
+
+        // Bottom wisp: overshoot then hook back to the inner rim
+        ctx.quadraticCurveTo(pOutBotX - wisp, pOutBotY + wisp * 0.35, pInBotX, pInBotY);
+
+        // INNER arc: bottom → top (counter-clockwise)
+        ctx.arc(cxI, 0, RIn, +phi, -phi, true);
+
+        // Top wisp: small hook outward, then back to base top
+        ctx.quadraticCurveTo(pInTopX - wisp, pInTopY - wisp * 0.35, topBaseX, topBaseY);
+
+        // Close along the body side to give the root some thickness
+        ctx.lineTo(botBaseX, botBaseY);
+
+        // Draw the outline
+        ctx.strokeStyle = darker;
+        ctx.lineWidth = Math.max(0.8, bodyHt * 0.015);
+        ctx.stroke();
+
+        // Fill the shape
+        ctx.fill();
+        ctx.closePath();
+        break;
+      }
     }
   }
-}
 
-  
   // Main fish body continues here
 
   // body gradient
-  const grd = ctx.createLinearGradient(-bodyLen*0.5,0,bodyLen*0.5,0);
-  if(f.patternType==='solid'){ grd.addColorStop(0, base); grd.addColorStop(1, base); }
-  else if(f.patternType==='gradient'){ grd.addColorStop(0, base); grd.addColorStop(1, lighter); }
-  else if(f.patternType==='stripes'){ grd.addColorStop(0, base); grd.addColorStop(1, darker); }
-  else if(f.patternType==='spots'){ grd.addColorStop(0, lighter); grd.addColorStop(1, base); }
-  ctx.fillStyle = grd; ctx.beginPath(); ctx.ellipse(0,0, bodyLen*0.5, bodyHt*0.5, 0, 0, Math.PI*2); ctx.fill();
+  const grd = ctx.createLinearGradient(-bodyLen * 0.5, 0, bodyLen * 0.5, 0);
+  if (f.patternType === 'solid') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, base);
+  } else if (f.patternType === 'gradient') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, lighter);
+  } else if (f.patternType === 'stripes') {
+    grd.addColorStop(0, base);
+    grd.addColorStop(1, darker);
+  } else if (f.patternType === 'spots') {
+    grd.addColorStop(0, lighter);
+    grd.addColorStop(1, base);
+  }
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, bodyLen * 0.5, bodyHt * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // overlays
-  if(f.patternType==='stripes'){
-    ctx.globalAlpha = 0.25; ctx.fillStyle = '#000';
-    for(let x=-bodyLen*0.4; x<bodyLen*0.5; x+= bodyLen*0.15){ ctx.fillRect(x,-bodyHt*0.5, bodyLen*0.03, bodyHt); }
+  if (f.patternType === 'stripes') {
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#000';
+    for (let x = -bodyLen * 0.4; x < bodyLen * 0.5; x += bodyLen * 0.15) {
+      ctx.fillRect(x, -bodyHt * 0.5, bodyLen * 0.03, bodyHt);
+    }
     ctx.globalAlpha = 1;
   }
-  if(f.patternType==='spots'){
-    ctx.globalAlpha = 0.25; ctx.fillStyle = '#000';
-    for(let s=0;s<6;s++){ ctx.beginPath(); ctx.arc(rand(-bodyLen*0.3,bodyLen*0.3), rand(-bodyHt*0.3,bodyHt*0.3), rand(2,4),0,Math.PI*2); ctx.fill(); }
+  if (f.patternType === 'spots') {
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#000';
+    for (let s = 0; s < 6; s++) {
+      ctx.beginPath();
+      ctx.arc(
+        rand(-bodyLen * 0.3, bodyLen * 0.3),
+        rand(-bodyHt * 0.3, bodyHt * 0.3),
+        rand(2, 4),
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
   }
 
   // eye
-  ctx.fillStyle = '#fff'; const eyeX = bodyLen*0.22; const eyeY = -bodyHt*0.1;
-  ctx.beginPath(); ctx.arc(eyeX, eyeY, Math.max(2, bodyHt*0.12), 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(eyeX+1, eyeY, Math.max(1, bodyHt*0.06), 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  const eyeX = bodyLen * 0.22;
+  const eyeY = -bodyHt * 0.1;
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, Math.max(2, bodyHt * 0.12), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(eyeX + 1, eyeY, Math.max(1, bodyHt * 0.06), 0, Math.PI * 2);
+  ctx.fill();
 
   // mouth
-  ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bodyLen*0.5-2, 0, 2, 0.2, -0.2); ctx.stroke();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(bodyLen * 0.5 - 2, 0, 2, 0.2, -0.2);
+  ctx.stroke();
 
   // name label
-  if(f.name && f.name !== 'Unnamed'){
+  if (f.name && f.name !== 'Unnamed') {
     ctx.save();
     ctx.rotate(-f.dir);
-    const fontPx = Math.max(10, Math.floor(f.size*0.45));
+    const fontPx = Math.max(10, Math.floor(f.size * 0.45));
     ctx.font = `${fontPx}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
     const w = ctx.measureText(f.name).width;
-    const pad = 4; const y = -bodyHt*0.8; const h = fontPx + 4;
+    const pad = 4;
+    const y = -bodyHt * 0.8;
+    const h = fontPx + 4;
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(-w/2 - pad/2, y - h + 2, w + pad, h);
-    ctx.fillStyle = '#fff'; ctx.fillText(f.name, 0, y);
+    ctx.fillRect(-w / 2 - pad / 2, y - h + 2, w + pad, h);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(f.name, 0, y);
     ctx.restore();
   }
 
