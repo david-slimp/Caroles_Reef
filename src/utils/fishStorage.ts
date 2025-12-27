@@ -1,6 +1,7 @@
 // /src/utils/fishStorage.ts
 
 import { v4 as uuidv4 } from 'uuid';
+
 import { gameState } from '../state/GameState';
 
 /**
@@ -21,7 +22,7 @@ export interface SavedFish {
   id: string;
   name: string;
   saveDate: string;
-  fishData: any;
+  fishData: FishData;
   thumbnail?: string;
   species: string;
   rarity?: string;
@@ -32,7 +33,7 @@ export interface SavedFish {
 // Type for fish data as stored in LocalStorageManager
 interface StoredFish {
   id: string;
-  fishData: any;
+  fishData: FishData;
   timestamp: number;
   name?: string;
   saveDate?: string;
@@ -45,6 +46,13 @@ interface StoredFish {
 // We now use the centralized LocalStorageManager for all storage operations
 // The old STORAGE_KEY constant has been removed in favor of the storage manager
 
+type FishData = Record<string, unknown> & {
+  id?: string;
+  species?: string;
+  rarity?: string;
+  generation?: number;
+};
+
 /**
  * Saves a fish to local storage.
  *
@@ -52,11 +60,11 @@ interface StoredFish {
  * @param {string} [name=''] - The name of the fish (optional).
  * @returns {SavedFish | null} - The saved fish object, or null if an error occurred.
  */
-export function saveFish(fishData: any, name: string = ''): SavedFish | null {
+export function saveFish(fishData: FishData, name: string = ''): SavedFish | null {
   try {
     const currentState = gameState.getState();
     const fishCollection = currentState.fishCollection || [];
-    
+
     // Create a new saved fish object
     const now = Date.now();
     const savedFishItem: SavedFish = {
@@ -67,18 +75,21 @@ export function saveFish(fishData: any, name: string = ''): SavedFish | null {
       species: fishData.species || 'unknown',
       rarity: fishData.rarity,
       generation: fishData.generation,
-      timestamp: now
+      timestamp: now,
     };
-    
+
     // Add to fish collection
-    const updatedCollection = [...fishCollection, {
-      ...savedFishItem,
-      // Ensure we have all required fields for the storage format
-      timestamp: savedFishItem.timestamp || Date.now()
-    }];
-    
+    const updatedCollection = [
+      ...fishCollection,
+      {
+        ...savedFishItem,
+        // Ensure we have all required fields for the storage format
+        timestamp: savedFishItem.timestamp || Date.now(),
+      },
+    ];
+
     gameState.updateState({ fishCollection: updatedCollection });
-    
+
     return savedFishItem;
   } catch (error) {
     console.error('Error saving fish:', error);
@@ -114,7 +125,7 @@ export function getSavedFish(): SavedFish[] {
         rarity: fish.rarity,
         generation: fish.generation,
         thumbnail: fish.thumbnail,
-        timestamp
+        timestamp,
       };
     });
   } catch (error) {
@@ -132,9 +143,11 @@ export function getSavedFish(): SavedFish[] {
 export function removeSavedFish(fishId: string): boolean {
   try {
     const currentState = gameState.getState();
-    const updatedCollection = (currentState.fishCollection || []).filter((fish: { id: string }) => fish.id !== fishId);
+    const updatedCollection = (currentState.fishCollection || []).filter(
+      (fish: { id: string }) => fish.id !== fishId
+    );
     gameState.updateState({ fishCollection: updatedCollection });
-    
+
     return true;
   } catch (error) {
     console.error('Error removing fish:', error);

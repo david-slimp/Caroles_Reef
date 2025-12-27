@@ -9,6 +9,8 @@
 import { FishCollection as BioInventory } from '../FishCollection';
 import { toast } from '../toast';
 
+type BioData = Record<string, unknown>;
+
 /**
  * Configuration options for the SpawnToTank button
  */
@@ -17,23 +19,23 @@ export interface SpawnToTankConfig {
    * The target DOM element where the button will be rendered
    */
   container: HTMLElement;
-  
+
   /**
-   * Callback triggered when a bio creature is successfully spawned
+   * Callback triggered when a bio entity is successfully spawned
    * @param bioData - The data of the spawned bio
    */
-  onSpawn?: (bioData: any) => void;
-  
+  onSpawn?: (bioData: BioData) => void;
+
   /**
    * Callback for handling any errors during the spawn process
    * @param error - The error that occurred
    * @param bioData - The bio data that failed to spawn (if available)
    */
-  onError?: (error: Error, bioData?: any) => void;
+  onError?: (error: Error, bioData?: BioData) => void;
 }
 
 /**
- * Handles the UI and logic for spawning the bio creatures into the tank
+ * Handles the UI and logic for spawning the bio entity into the tank
  */
 export class SpawnToTankButton {
   private button: HTMLButtonElement;
@@ -62,10 +64,10 @@ export class SpawnToTankButton {
     this.button.className = 'btn-spawn-to-tank';
     this.button.textContent = 'Spawn to Tank';
     this.button.title = 'Add a bio from your inventory to the tank';
-    
+
     this.button.addEventListener('click', this.handleClick.bind(this));
     this.config.container.appendChild(this.button);
-    
+
     this.isInitialized = true;
   }
 
@@ -76,16 +78,16 @@ export class SpawnToTankButton {
   private async handleClick(): Promise<void> {
     try {
       // Show the bio inventory UI (show fish collection right now)
-      this.bioInv.show(async (bioData: any) => {
+      this.bioInv.show(async (bioData: BioData) => {
         try {
           // TODO: Replace with proper bio spawning logic
           // This is a temporary implementation that assumes legacy fish data
           await this.spawnBio(bioData);
-          
+
           if (this.config.onSpawn) {
             this.config.onSpawn(bioData);
           }
-          
+
           toast('Bio added to tank!');
         } catch (error) {
           this.handleSpawnError(error as Error, bioData);
@@ -101,11 +103,11 @@ export class SpawnToTankButton {
    * @param bioData - The data of the bio to spawn
    * @private
    */
-  private async spawnBio(bioData: any): Promise<void> {
+  private async spawnBio(bioData: BioData): Promise<void> {
     // TODO: Implement actual bio spawning logic
     // This is a placeholder that will be replaced with proper entity management
     console.debug('Spawning bio:', bioData);
-    
+
     // Temporary implementation - will be updated to use the game's entity system
     if (window.fishCollection && typeof window.fishCollection.spawnFishFromData === 'function') {
       await window.fishCollection.spawnFishFromData(bioData);
@@ -120,13 +122,13 @@ export class SpawnToTankButton {
    * @param bioData - The bio data that failed to spawn (if available)
    * @private
    */
-  private handleSpawnError(error: Error, bioData?: any): void {
+  private handleSpawnError(error: Error, bioData?: BioData): void {
     console.error('Error spawning bio:', error, bioData);
-    
+
     if (this.config.onError) {
       this.config.onError(error, bioData);
     }
-    
+
     toast('Failed to add bio to tank', true);
   }
 

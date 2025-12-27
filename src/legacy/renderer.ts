@@ -7,14 +7,29 @@ export function createRenderer(deps: {
   ctx: CanvasRenderingContext2D;
   getSize: () => { W: number; H: number };
   themeRef: { value: string };
-  drawBackground: (ctx: CanvasRenderingContext2D, W: number, H: number, theme: string) => Promise<void>;
+  drawBackground: (
+    ctx: CanvasRenderingContext2D,
+    W: number,
+    H: number,
+    theme: string
+  ) => Promise<void>;
   drawDecor: () => void;
   drawPellets: (ctx: CanvasRenderingContext2D) => void;
   drawFish: (f: any) => void;
   fish: any[];
   bubbles: { draw: () => void };
 }) {
-  const { ctx, getSize, themeRef, drawBackground, drawDecor, drawPellets, drawFish, fish, bubbles } = deps;
+  const {
+    ctx,
+    getSize,
+    themeRef,
+    drawBackground,
+    drawDecor,
+    drawPellets,
+    drawFish,
+    fish,
+    bubbles,
+  } = deps;
 
   async function draw() {
     const { W, H } = getSize();
@@ -22,7 +37,7 @@ export function createRenderer(deps: {
     await drawBackground(ctx, W, H, themeRef.value);
     drawDecor();
     drawPellets(ctx);
-    fish.forEach((f) => drawFish(f, ctx));
+    fish.forEach(f => drawFish(f, ctx));
     bubbles.draw();
   }
 

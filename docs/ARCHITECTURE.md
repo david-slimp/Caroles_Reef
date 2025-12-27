@@ -1,5 +1,10 @@
 # Carole's Reef - Architecture
 
+## Status
+
+- Mixed: GameState/persistence details reflect current intent, while input/rendering still rely on legacy runtime
+- Use `docs/ActiveFiles.txt` for the definitive list of active runtime files
+
 ## Overview
 
 Carole's Reef is an aquarium simulation featuring procedurally generated fish with genetic traits. This document outlines the high-level architecture and design decisions.
@@ -15,12 +20,12 @@ graph TD
     C --> D[Game Systems]
     D --> E[Rendering]
     D --> C
-    
+
     subgraph "Persistence Layer"
         F[localStorageManager] <--> G[localStorage]
         H[gameDataValidator] <--> F
     end
-    
+
     C <--> F
     H -. Validates .-> C
 ```
@@ -28,6 +33,7 @@ graph TD
 ## State Management
 
 ### GameState (Single Source of Truth)
+
 - **Location**: `/state/GameState.ts`
 - **Purpose**: Centralized management of all game state
 - **Key Responsibilities**:
@@ -35,8 +41,10 @@ graph TD
   - Manages subscriptions to state changes
   - Handles state updates in an immutable way
   - Coordinates with persistence layer
+  - Planned: replace `fishCollection` with `bioInventory` to support multi-species ownership
 
 ### State Structure
+
 ```typescript
 interface GameState {
   version: string;
@@ -69,12 +77,14 @@ interface GameState {
 ## Data Flow & Persistence
 
 ### Loading Data
+
 1. `localStorageManager.load()` retrieves raw data from localStorage
 2. `gameDataValidator` validates and transforms the raw data
 3. Validated data is passed to `gameState.load()`
 4. `gameState` updates internal state and notifies subscribers
 
 ### Saving Data
+
 1. `gameState.save()` prepares data for persistence
 2. Converts internal state to `GameSaveData` format
 3. Calls `storageManager.save()` with the prepared data
@@ -83,6 +93,7 @@ interface GameState {
 ## Validation Layer
 
 ### gameDataValidator
+
 - **Location**: `/src/utils/gameDataValidator.ts`
 - **Responsibilities**:
   - Validates all game data before it enters the state
@@ -93,6 +104,7 @@ interface GameState {
 ## Storage Layer
 
 ### localStorageManager
+
 - **Location**: `/src/utils/localStorageManager.ts`
 - **Key Features**:
   - Only module that directly interacts with `localStorage`
@@ -105,11 +117,9 @@ interface GameState {
 - **State Updates**:
   - Batched updates to minimize re-renders
   - Selective subscription model for components
-  
 - **Memory Management**:
   - Efficient data structures for fish collection
   - Object pooling for frequently created/destroyed entities
-  
 - **Rendering**:
   - Canvas-based rendering for optimal performance
   - Spatial partitioning for collision detection

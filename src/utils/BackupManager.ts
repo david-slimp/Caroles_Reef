@@ -1,8 +1,8 @@
-import { storageManager } from './localStorageManager';
-import gameDataValidator from './gameDataValidator';
-import { getSavedFish } from './fishStorage';
 import { fishManager } from '../creatures/FishManager';
 import { gameState } from '../state/GameState';
+
+import gameDataValidator from './gameDataValidator';
+import { storageManager, GameSaveData } from './localStorageManager';
 
 interface RestoreOptions {
   file: File;
@@ -19,8 +19,8 @@ interface FishData {
   rarity?: string;
   generation?: string;
   thumbnail?: string;
-  fishData?: Record<string, any>;
-  [key: string]: any;
+  fishData?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 /**
@@ -44,7 +44,7 @@ class BackupManager {
 
     const result: FishData[] = [];
 
-    fishCollection.forEach((fish) => {
+    fishCollection.forEach(fish => {
       const validated = gameDataValidator.validateAndTransformFishCollectionItem(
         fish,
         Math.floor(Date.now() / 1000)
@@ -78,7 +78,8 @@ class BackupManager {
 
       // Get the current in-memory bio (fish) Inventory
       const bioInventory = fishManager.getSavedFish();
-      const normalizedCollection = this.validateFishCollection(currentGameState.fishCollection || bioInventory) || [];
+      const normalizedCollection =
+        this.validateFishCollection(currentGameState.fishCollection || bioInventory) || [];
       const normalizedBioInventory = this.validateFishCollection(bioInventory) || [];
 
       // Create backup object with game state and bio (fish) Inventory
@@ -98,7 +99,7 @@ class BackupManager {
           },
         })),
       };
-      
+
       return JSON.stringify(backupData, null, 2);
     } catch (error) {
       console.error('Error creating backup:', error);
@@ -112,17 +113,24 @@ class BackupManager {
    * @param {boolean} preserveTankFish Whether to preserve fish currently in the tank
    * @returns {Promise<boolean>} True if restore was successful
    */
-  public async restoreBackup(backupData: string, preserveTankFish: boolean = true): Promise<boolean> {
+  public async restoreBackup(
+    backupData: string,
+    preserveTankFish: boolean = true
+  ): Promise<boolean> {
     console.log('Starting restoreBackup with preserveTankFish:', preserveTankFish);
-    
+
     // Get current tank fish before doing anything else
     let currentTankFish: FishData[] = [];
-    if (preserveTankFish && typeof window !== 'undefined' && (window as any).fish) {
+    if (
+      preserveTankFish &&
+      typeof window !== 'undefined' &&
+      (window as { fish?: FishData[] }).fish
+    ) {
       console.log('Preserving current tank fish...');
       // Create a deep copy of current fish to avoid reference issues
-      currentTankFish = JSON.parse(JSON.stringify((window as any).fish || []));
+      currentTankFish = JSON.parse(JSON.stringify((window as { fish?: FishData[] }).fish || []));
       console.log(`Found ${currentTankFish.length} fish to preserve`);
-      
+
       // Generate new IDs for current tank fish to avoid conflicts
       currentTankFish.forEach(fish => {
         const newId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -132,89 +140,88 @@ class BackupManager {
     } else {
       console.log('Not preserving current tank fish');
     }
-    
-    try {
 
+    try {
       // Parse and validate backup data
       const backup = JSON.parse(backupData);
-      
+
       if (!backup || typeof backup !== 'object') {
         throw new Error('Invalid backup format');
       }
-      
+
       // Check backup version
       if (backup.version !== '1.0.0') {
         throw new Error(`Unsupported backup version: ${backup.version}`);
       }
-      
+
       // Validate required data
       if (!backup.gameState || typeof backup.gameState !== 'object') {
         throw new Error('Invalid game state in backup');
       }
-      
+
       if (!Array.isArray(backup.fishCollection)) {
         throw new Error('Invalid fish collection in backup');
       }
-      
+
       // Update the game data with the backup
       console.log('Restoring game state and fish collection...');
-      const currentData = { ...storageManager.getCurrentData() };
-      
+      const currentData: GameSaveData = { ...storageManager.getCurrentData() };
+
       // Create a deep copy of the backup data to avoid modifying the original
       const backupCopy = JSON.parse(JSON.stringify(backup));
-      
+
       // Ensure fishCollection exists and is an array
       if (!Array.isArray(backupCopy.fishCollection)) {
         backupCopy.fishCollection = [];
       }
-      
+
       // Update the in-memory data with backup data
-      const updatedData = {
+      const updatedData: GameSaveData = {
         ...currentData,
-        ...backupCopy.gameState,
+        ...(backupCopy.gameState as Partial<GameSaveData>),
         fishCollection: backupCopy.fishCollection,
-        lastSaved: Date.now()
+        lastSaved: Date.now(),
       };
-      
+
       console.log(`Restoring ${updatedData.fishCollection.length} fish from backup`);
-      
+
       // Validate the fish collection before saving
       const validatedFishCollection = this.validateFishCollection(updatedData.fishCollection);
       if (!validatedFishCollection) {
         throw new Error('Failed to validate fish collection from backup');
       }
-      
+
       // Update the data with validated collection
       updatedData.fishCollection = validatedFishCollection;
-      
+
       // Ensure fish array is populated for backward compatibility
       if (Array.isArray(updatedData.fishCollection) && !Array.isArray(updatedData.fish)) {
         updatedData.fish = updatedData.fishCollection.map((item: FishData) => ({
           id: item.id,
           name: item.fishData?.name || 'Unknown Fish',
-          species: item.fishData?.species || 'unknown'
+          species: item.fishData?.species || 'unknown',
         }));
       }
-      
+
       // Log the data we're about to save
       console.log('Data to be saved:', {
         fishCount: updatedData.fish?.length || 0,
         fishCollectionCount: updatedData.fishCollection?.length || 0,
         hasFishArray: Array.isArray(updatedData.fish),
-        hasFishCollection: Array.isArray(updatedData.fishCollection)
+        hasFishCollection: Array.isArray(updatedData.fishCollection),
       });
-      
+
       if (updatedData.fishCollection && updatedData.fishCollection.length > 0) {
         console.log('Sample fish from backup:', {
           id: updatedData.fishCollection[0].id,
           name: updatedData.fishCollection[0].fishData?.name,
-          species: updatedData.fishCollection[0].fishData?.species
+          species: updatedData.fishCollection[0].fishData?.species,
         });
       }
 
       // Save the updated data through storageManager (async to avoid blocking)
       console.log('Saving validated backup data to storage...');
-      const saveSuccess = await new Promise<boolean>((resolve) => {
+      const saveSuccess = await new Promise<boolean>(resolve => {
         // Use setTimeout to ensure this runs in the next tick
         setTimeout(() => {
           try {
@@ -227,58 +234,62 @@ class BackupManager {
           }
         }, 0);
       });
-      
+
       if (!saveSuccess) {
         throw new Error('Failed to save validated backup data to storage');
       }
 
       // Sync GameState with restored data so UI reflects the backup immediately
       try {
-        gameState.load(updatedData as any);
+        gameState.load(updatedData);
       } catch (error) {
         console.error('Failed to sync GameState after backup restore:', error);
       }
-      
+
       // Update the global state without triggering a page reload
       if (typeof window !== 'undefined') {
-        const win = window as any;
-        
+        const win = window as {
+          fishCollection?: FishData[];
+          fish?: Array<Record<string, unknown> & { id?: string; originalId?: string }>;
+          tankFishIds?: Set<string>;
+        };
+
         console.log('Global state before update:', {
           hasFishCollection: Array.isArray(win.fishCollection),
           hasFishArray: Array.isArray(win.fish),
           currentFishCount: win.fish?.length || 0,
-          currentCollectionCount: win.fishCollection?.length || 0
+          currentCollectionCount: win.fishCollection?.length || 0,
         });
-        
+
         // Update fish collection if it exists
         if (Array.isArray(updatedData.fishCollection)) {
           console.log('Updating in-memory fish collection...');
           win.fishCollection = [...updatedData.fishCollection];
           console.log(`Updated fish collection with ${win.fishCollection.length} fish`);
-          
+
           // Ensure the fish array is in sync
           if (!win.fish) win.fish = [];
-          win.fish = updatedData.fishCollection.map((item: any) => ({
+          win.fish = updatedData.fishCollection.map((item: FishData) => ({
             id: item.id,
             name: item.fishData?.name || 'Unknown',
             species: item.fishData?.species || 'unknown',
-            ...item.fishData
+            ...item.fishData,
           }));
           console.log(`Updated fish array with ${win.fish.length} fish`);
         }
-        
+
         // Add back the preserved tank fish
         if (currentTankFish.length > 0) {
           console.log(`Adding back ${currentTankFish.length} preserved fish to the tank...`);
           win.fish.push(...currentTankFish);
           console.log(`Total fish after adding preserved fish: ${win.fish.length}`);
         }
-        
+
         // Reinitialize FishManager to ensure it has the latest data
         try {
           // Clear existing fish collection
           fishManager.clearAllFish();
-          
+
           // Add all fish from the backup to FishManager
           if (Array.isArray(updatedData.fishCollection)) {
             updatedData.fishCollection.forEach((fish: FishData) => {
@@ -289,49 +300,56 @@ class BackupManager {
               }
             });
           }
-          
-          console.log(`FishManager updated with ${updatedData.fishCollection?.length || 0} fish from backup`);
+
+          console.log(
+            `FishManager updated with ${updatedData.fishCollection?.length || 0} fish from backup`
+          );
         } catch (e) {
           console.error('Failed to reinitialize FishManager after backup restore:', e);
         }
 
         // Notify components about the update
-        const event = new CustomEvent('backupRestored', { 
-          detail: { 
+        const event = new CustomEvent('backupRestored', {
+          detail: {
             fishCount: win.fish?.length || 0,
-            collectionCount: win.fishCollection?.length || 0
-          } 
+            collectionCount: win.fishCollection?.length || 0,
+          },
         });
         window.dispatchEvent(event);
       }
-      
+
       console.log('Game state restored and validated successfully');
-      
+
       // Add back the current tank fish after restore
       if (currentTankFish.length > 0 && typeof window !== 'undefined') {
         console.log(`Adding back ${currentTankFish.length} preserved fish to the tank...`);
         try {
-          // @ts-ignore - Accessing global fish array from the game
-          const fishArray = (window as any).fish || [];
-          console.log(`Current fish array length before adding preserved fish: ${fishArray.length}`);
-          
+          const fishArray = (window as { fish?: FishData[]; tankFishIds?: Set<string> }).fish || [];
+          console.log(
+            `Current fish array length before adding preserved fish: ${fishArray.length}`
+          );
+
           currentTankFish.forEach(fish => {
             fishArray.push(fish);
-            
+
             // Update tankFishIds if it exists
-            if ((window as any).tankFishIds) {
-              (window as any).tankFishIds.add(fish.originalId || fish.id);
+            if ((window as { tankFishIds?: Set<string> }).tankFishIds) {
+              (window as { tankFishIds?: Set<string> }).tankFishIds?.add(
+                fish.originalId || fish.id
+              );
             }
           });
-          
-          console.log(`Restored ${currentTankFish.length} fish to the tank. New fish array length: ${fishArray.length}`);
+
+          console.log(
+            `Restored ${currentTankFish.length} fish to the tank. New fish array length: ${fishArray.length}`
+          );
         } catch (error) {
           console.error('Error restoring tank fish after backup:', error);
         }
       } else {
         console.log('No fish to restore or window is not defined');
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error restoring backup:', error);
@@ -353,7 +371,7 @@ class BackupManager {
       '_',
       pad(date.getHours()),
       pad(date.getMinutes()),
-      pad(date.getSeconds())
+      pad(date.getSeconds()),
     ].join('');
   }
 
@@ -368,7 +386,7 @@ class BackupManager {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
+
       // Build filename with optional tag
       const tagSuffix = tag ? `_${tag}` : '';
       a.download = `caroles_reef_backup_${this.formatDateForFilename(new Date())}${tagSuffix}.json`;
@@ -393,30 +411,27 @@ class BackupManager {
     const { file, preserveTankFish = true } = options;
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
-      reader.onload = async (event) => {
+
+      reader.onload = async event => {
         try {
           if (!event.target?.result) {
             throw new Error('Failed to read file');
           }
-          
+
           console.log('Starting backup restore...');
-          const result = await this.restoreBackup(
-            event.target.result as string, 
-            preserveTankFish
-          );
-          
+          const result = await this.restoreBackup(event.target.result as string, preserveTankFish);
+
           resolve(result);
         } catch (error) {
           console.error('Error during backup restore:', error);
           reject(error);
         }
       };
-      
+
       reader.onerror = () => {
         reject(new Error('Error reading backup file'));
       };
-      
+
       reader.readAsText(file);
     });
   }

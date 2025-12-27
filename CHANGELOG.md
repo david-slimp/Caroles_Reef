@@ -1,7 +1,55 @@
 # Changelog
 
-## [0.1.4] - 2025-12-25
+## [0.1.5] - 2025-12-27
+
 ### Fixed
+
+- Removed `coverage/` from git tracking and added it to `.gitignore`
+- Removed unused `old/` directory from the repo
+- Removed legacy snapshot `src/legacy/runLegacyGame.ts.0829_2040`
+- Fixed lint blockers: removed `require()` usage in TS, scoped switch case declarations, removed unused import, replaced `@ts-ignore` with `@ts-expect-error`
+- Removed dynamic import of `localStorageManager` in `GameState` to avoid mixed import mode warning
+- Moved Breeding HUD to the top-right under the menu bar
+- Breeding HUD now toggles from a FishCard button instead of opening automatically
+- ESLint now ignores `src/legacy/**` during cleanup
+- Added unused variable audit notes
+- Removed unused variables from `src/entities/fish.ts`
+- Background config uses `unknown` for extra keys instead of `any`
+- Tightened `FishManager` fish data typing and added a FishManager test
+- Tightened fish storage typing and added a fishStorage test
+- Creature type index signatures now use `unknown` instead of `any`
+- GameState fishCollection typing tightened and new GameState test added
+- Tightened spawn-to-tank bio data typing to avoid `any`
+- Tightened localStorageManager fish data and serialization typing to avoid `any`
+- Replaced remaining explicit `any` usage in FishCollection, fish entity logic, BackupManager, validator, and tests
+- Updated ActiveFiles core/audio/legacy entries and persistence overview to match current code and plans
+- Updated ActiveFiles entities/rendering/creatures/UI/config/utilities sections for current active files
+- Added missing active legacy/state files to ActiveFiles list
+- Marked spawn-to-tank UI control as planned (not wired yet) in ActiveFiles
+- Added legacy methods/functions inventory to docs
+- Marked legacy methods/functions as used/internal in docs/LegMethFunc.txt
+- Removed unused stubs `src/audio/bus.ts` and `src/creatures/registry.ts`
+- Labeled docs with current vs planned status and updated doc notes (Architecture, Development, Tooling, UsageMap, FileStructure, design notes)
+- Verified `npm test` and `npm run build` after cleanup changes
+- Added bioInventory naming plan to planning docs
+- Confirmed bioInventory direction and persistence path in TODO
+- Added TODOs for duplication cleanup (collection CRUD, validation, UI storage fallbacks, e2e key)
+- Updated e2e fish collection tests to use `caroles_reef_save_data`
+- Added backup export/restore tests to validate fish data normalization and defaults
+- Made topbar opaque and aligned to the top; constrained fish movement below the menu bar
+- Mating target selection now respects opposite sex and drops stale mate targets
+- Load saved fish from localStorage on startup; only seed 10 fish when no saved data exists
+- Restore only live tank fish on reload (collection stays in storage)
+- Fish movement bounds now refresh when the window is resized
+- Collection view now includes fish sex
+- Persist live tank snapshot (including non-collection fish) and flush on exit/reload
+- Bumped app version to 0.1.5
+- Added changelog formatter to enforce heading spacing rules
+
+## [0.1.4] - 2025-12-25
+
+### Fixed
+
 - Centralized fish collection persistence through `GameState.save()` and `localStorageManager`
 - Removed direct localStorage access from `FishCollection` in active code path
 - Added validation for `fishCollection` entries and normalized top-level trait fields (senseGene, finShape, patternType, eyeType, colorHue)
@@ -49,22 +97,30 @@
 - Documented GameState as the single runtime source of truth for Issue #10
 
 ## [0.1.3] - 2025-08-24
+
 ### Added
+
 - Added new issue templates
 - Added auto-assignment and labeling for issues/PRs
+
 ### Fixed
+
 - Resolved multiple confirmation clicks when removing fish from the collection view (#9)
 - Updated semantic-release configuration to handle versioning correctly
 - Updated sed command for semantic-release to handle single quotes
 - Updated sed command to be cross-platform compatible
+
 ### Changed
+
 - Bumped project version to 0.1.3
 - CI: made lint/typecheck/test non-blocking and split linting from tests
 - CI: updated actions/upload-artifact to v4
 - Build: added @semantic-release/exec dev dependency
 
 ## [0.1.2] - 2025-08-23
+
 ### Fixed
+
 - Fish tails "finShape" was not drawn in a noticeable difference, so we updated the valid finShapes to be ['pointy', 'round', 'fan', 'forked', 'lunate'] (deprecating 'long') and tweaked the look of each
 - **Fish Validation**
   - Fixed invalid fin shapes (like 'long') being set to 'fan' by default
@@ -72,7 +128,9 @@
   - Ensured corrected fin shapes are saved back to localStorage
 
 ## [0.1.1] - 2025-08-22
+
 ### Changed
+
 - **Project Structure**
   - Moved `style.css` to `src/styles/` for better organization
   - Relocated deployment scripts to `scripts/` directory
@@ -82,7 +140,9 @@
   - Added the new background music (track 02) - from suno.ai
 
 ## [0.1.0] - 2025-08-22
+
 ### Added
+
 - **Creature Validation System**
   - Added trait range validation for all creature attributes
   - Automatic correction of out-of-range values when loading from storage
@@ -95,6 +155,7 @@
   - Clicking the same column toggles between ascending and descending order
 
 ### Fixed
+
 - **Data Integrity**
   - Fixed potential data corruption by validating all creature attributes on load
   - Ensured all numeric traits stay within defined ranges
@@ -108,11 +169,14 @@
 - Had to make some changes to deploy.sh as we moved sensitive data to .env and then deploy.sh started to complain about noEmitOnError.. should be working now.
 
 ### Changed
+
 - Commented out two lines in src/entities/fish.ts that call fishCollection.refreshCollection() because (for now) we do not want entire View Collection window to redraw and reposition at the top of the list when a fish is added to the tank. These two lines have FIXME, and will eventually need to get fixed so that the VCw does get dynamically updated when fish info changes and the VCw is open
 - "Caroles_Reef" had been planned as 3D, and this 2D version was to do a quick-start to show the basic potential of the game. Since then I've decided this 2D version will be the main focus, and PERHAPS a 3D version may come later... but at this point I want the "Caroles_Reef" name and ID to point to the 2D version locally and on GitHub, and we will have a Caroles_Reef-3D if that ever comes about. So I've changed the GitHub repo for this project to https://github.com/david-slimp/Caroles_Reef.git
 
 ## [0.0.8] - 2025-08-15
+
 ### Fixed
+
 - Fixed release button in FishCard to properly remove selected fish from the tank
   - Now correctly identifies and removes the selected fish instead of checking health
   - Properly cleans up fish tracking in tankFishIds
@@ -123,7 +187,9 @@
   - Added comments for better maintainability
 
 ## [0.0.7] - 2025-08-15
+
 ### Fixed
+
 - Fixed animation loop to prevent multiple concurrent frames
 - Resolved background image flickering during rendering
 - Improved canvas rendering performance

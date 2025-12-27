@@ -6,7 +6,7 @@
     "node": true,
     "jest": true
   },
-  "ignorePatterns": ["main.js"],
+  "ignorePatterns": ["main.js", "src/legacy/**"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",

@@ -1,6 +1,6 @@
 {
   "name": "caroles_reef",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A relaxing virtual aquarium where you can breed and care for beautiful tropical fish",
   "type": "module",
   "main": "src/main.ts",
@@ -14,7 +14,7 @@
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --ignore-path .gitignore --fix",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\" && node scripts/format-changelog.js",
     "prepare": "husky",
     "prepare:ci": "npm install --no-package-lock --no-save"
   },
@@ -85,6 +85,9 @@
     ],
     "**/*.{json,md,yml}": [
       "prettier --write"
+    ],
+    "CHANGELOG.md": [
+      "node scripts/format-changelog.js"
     ]
   },
   "directories": {

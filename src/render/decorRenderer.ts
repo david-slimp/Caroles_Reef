@@ -6,7 +6,7 @@ type Env = {
   ctx: CanvasRenderingContext2D;
   getSize: () => { W: number; H: number };
   decors: ReadonlyArray<Decor>;
-  rand: (a:number,b:number)=>number;
+  rand: (a: number, b: number) => number;
 };
 
 let env: Env;

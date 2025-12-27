@@ -1,0 +1,48 @@
+# Legacy Methods and Functions Inventory
+Status: Current inventory for legacy runtime modules
+
+## src/legacy/bubbles.ts
+- createBubbles (USED: src/legacy/runLegacyGame.ts)
+- bubbles.update (USED: src/legacy/runLegacyGame.ts)
+- bubbles.draw (USED: src/legacy/renderer.ts)
+
+## src/legacy/fishCardUI.ts
+- createFishCardUI (USED: src/legacy/runLegacyGame.ts)
+- closeCard (USED: internal to src/legacy/fishCardUI.ts)
+- refreshFishCard (USED: internal to src/legacy/fishCardUI.ts)
+- showFishCard (USED: src/legacy/inputHandlers.ts via runLegacyGame)
+- refreshIfVisible (USED: src/legacy/runLegacyGame.ts)
+- ensureBreedingHud (USED: internal to src/legacy/fishCardUI.ts)
+- updateBreedingHud (USED: internal to src/legacy/fishCardUI.ts)
+- formatNumber (USED: internal to src/legacy/fishCardUI.ts)
+- formatSeconds (USED: internal to src/legacy/fishCardUI.ts)
+
+## src/legacy/inputHandlers.ts
+- attachInputHandlers (USED: src/legacy/runLegacyGame.ts)
+
+## src/legacy/pellets.ts
+- addPellet (USED: src/legacy/runLegacyGame.ts)
+- updatePellets (USED: src/legacy/runLegacyGame.ts)
+- drawPellets (USED: src/legacy/renderer.ts via runLegacyGame)
+
+## src/legacy/renderer.ts
+- createRenderer (USED: src/legacy/runLegacyGame.ts)
+- draw (USED: src/legacy/runLegacyGame.ts)
+
+## src/legacy/runLegacyGame.ts
+- runLegacyGame (USED: src/main.ts)
+- resize (USED: internal to src/legacy/runLegacyGame.ts)
+- rand (USED: internal to src/legacy/runLegacyGame.ts)
+- randi (USED: internal to src/legacy/runLegacyGame.ts)
+- clamp (USED: internal to src/legacy/runLegacyGame.ts)
+- chance (USED: internal to src/legacy/runLegacyGame.ts)
+- uuid (USED: internal to src/legacy/runLegacyGame.ts)
+- setTheme (USED: internal to src/legacy/runLegacyGame.ts)
+- toast (USED: internal to src/legacy/runLegacyGame.ts)
+- refreshDex (USED: internal to src/legacy/runLegacyGame.ts)
+- loop (USED: internal to src/legacy/runLegacyGame.ts)
+
+## src/legacy/uiControls.ts
+- setupUIControls (USED: src/legacy/runLegacyGame.ts)
+- updateMuteButtons (USED: internal to src/legacy/uiControls.ts)
+- togglePanel (USED: internal to src/legacy/uiControls.ts)

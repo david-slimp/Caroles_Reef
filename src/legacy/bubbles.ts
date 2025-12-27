@@ -3,7 +3,10 @@
  * Bubbles system extracted from legacy code.
  * Keeps the exact visual and behavioral logic while being modular.
  */
-export function createBubbles(getSize: () => { W: number; H: number }, ctx: CanvasRenderingContext2D) {
+export function createBubbles(
+  getSize: () => { W: number; H: number },
+  ctx: CanvasRenderingContext2D
+) {
   const bubbles = {
     pool: [] as Array<{ x: number; y: number; r: number; v: number }>,
     targetDensity: 0.6,
@@ -17,10 +20,10 @@ export function createBubbles(getSize: () => { W: number; H: number }, ctx: Canv
           v: 20 + Math.random() * 30,
         });
       }
-      this.pool.forEach((b) => {
+      this.pool.forEach(b => {
         b.y -= b.v * dt;
         if (b.y < -10) {
-          b.y = H + (Math.random() * 60);
+          b.y = H + Math.random() * 60;
           b.x = Math.random() * W;
         }
       });
@@ -28,8 +31,8 @@ export function createBubbles(getSize: () => { W: number; H: number }, ctx: Canv
     draw() {
       const { W, H } = getSize();
       ctx.globalAlpha = 0.35;
-      ctx.fillStyle = "#ffffff";
-      this.pool.forEach((b) => {
+      ctx.fillStyle = '#ffffff';
+      this.pool.forEach(b => {
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
         ctx.fill();

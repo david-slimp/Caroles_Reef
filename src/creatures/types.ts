@@ -26,7 +26,7 @@ export interface CreatureBase {
     fatherId?: string;
   };
   // Add any other common properties here
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -51,7 +51,7 @@ export interface SpeciesConfig {
     // Add any other genetic configuration here
   };
   // Add any other species-specific configuration here
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

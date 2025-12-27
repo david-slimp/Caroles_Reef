@@ -1,4 +1,7 @@
-# Fire Structure - planning and idea
+# File Structure - planning and idea
+# Status: Future/target layout (not current runtime)
+
+# Inventory naming: plan to migrate `fishCollection` -> `bioInventory` for multi-species ownership.
 
 # The target layout (best-of-both, TS-ready)
 

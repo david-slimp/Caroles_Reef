@@ -3,7 +3,7 @@ import { DEFAULT_SAVE_DATA, validateAndTransformGameData } from './gameDataValid
 /**
  * Represents the complete game state that gets persisted to localStorage.
  * This interface defines the structure of all game data that will be saved and loaded.
- * 
+ *
  * @property {string} version - The version of the game data format, used for migration
  * @property {number} lastSaved - Timestamp of when the game was last saved (milliseconds since epoch)
  * @property {Object} gameState - Current game state information
@@ -38,7 +38,7 @@ export interface GameSaveData {
   version: string;
   /** When this game was last saved */
   lastSaved: number;
-  
+
   // Game state
   gameState: {
     /** Current game time or play session */
@@ -75,9 +75,14 @@ export interface GameSaveData {
   // New fish collection format
   fishCollection?: Array<{
     id: string;
-    fishData: any;
+    fishData: Record<string, unknown>;
     timestamp: number;
   }>;
+
+  // Live tank fish snapshot (includes non-collection fish)
+  tankFish?: Array<Record<string, unknown>>;
+  fishInTank?: string[];
+  fishInTankOriginalIds?: string[];
 
   // Tank state
   tank: {
@@ -105,22 +110,23 @@ export interface GameSaveData {
 /** Storage key for game data */
 const STORAGE_KEY = 'caroles_reef_save_data';
 
+type LegacyFish = Record<string, unknown> & { id?: string };
 
 /**
  * Centralized localStorage management for the game.
  * This singleton class handles all interactions with the browser's localStorage,
  * providing a clean API for saving and loading game state.
- * 
+ *
  * @example
  * // Getting the singleton instance
  * const storage = LocalStorageManager.getInstance();
- * 
+ *
  * // Loading game data
  * const gameData = storage.getCurrentData();
- * 
+ *
  * // Saving game data
  * storage.save(updatedGameData);
- * 
+ *
  * // Resetting to defaults
  * storage.resetToDefaults();
  */
@@ -137,11 +143,10 @@ class LocalStorageManager {
     this.currentData = this.load();
   }
 
-  
   /**
    * Gets the singleton instance of the LocalStorageManager.
    * Creates a new instance if one doesn't exist.
-   * 
+   *
    * @returns {LocalStorageManager} The singleton instance
    * @static
    */
@@ -152,11 +157,10 @@ class LocalStorageManager {
     return LocalStorageManager.instance;
   }
 
-
   /**
    * Loads game data from localStorage.
    * If no saved data exists or if there's an error, returns default data.
-   * 
+   *
    * @returns {GameSaveData} The loaded or default game data
    * @throws Will log errors to console but will always return a valid GameSaveData
    */
@@ -164,7 +168,7 @@ class LocalStorageManager {
     try {
       const savedData = localStorage.getItem(STORAGE_KEY);
       console.log('[Storage] Loaded saved data from localStorage:', savedData);
-      
+
       let result: GameSaveData;
       if (!savedData) {
         console.log('[Storage] No saved data found, using defaults');
@@ -174,27 +178,31 @@ class LocalStorageManager {
           // Parse and validate the saved data
           const parsedData = JSON.parse(savedData);
           result = validateAndTransformGameData<GameSaveData>(parsedData);
-          
+
           // Ensure we have a valid fish collection
           if (!Array.isArray(result.fishCollection) && Array.isArray(result.fish)) {
             // Migrate from old fish array to fishCollection
-            result.fishCollection = result.fish.map((fish: any) => ({
+            result.fishCollection = result.fish.map((fish: LegacyFish) => ({
               id: fish.id || `fish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               fishData: fish,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             }));
-            console.log(`[Storage] Migrated ${result.fishCollection.length} fish from legacy format`);
+            console.log(
+              `[Storage] Migrated ${result.fishCollection.length} fish from legacy format`
+            );
           } else if (!Array.isArray(result.fishCollection)) {
             result.fishCollection = [];
           }
-          
-          console.log(`[Storage] Loaded game state with ${result.fishCollection?.length || 0} fish`);
+
+          console.log(
+            `[Storage] Loaded game state with ${result.fishCollection?.length || 0} fish`
+          );
         } catch (e) {
           console.warn('[Storage] Error parsing saved data, using defaults', e);
           result = this.deepClone(DEFAULT_SAVE_DATA);
         }
       }
-      
+
       // Update the current data cache
       this.currentData = result;
       return result;
@@ -204,15 +212,14 @@ class LocalStorageManager {
     }
   }
 
-
   /**
    * Saves the current game state to localStorage.
    * Updates the lastSaved timestamp before saving.
-   * 
+   *
    * @param {GameSaveData} data - The complete game state to save
    * @returns {boolean} True if save was successful, false otherwise
    * @throws Will log errors to console if saving fails
-   * 
+   *
    * @deprecated Use saveAsync for better error handling with Promises
    * Keep the synchronous save method for backward compatibility
    */
@@ -221,18 +228,18 @@ class LocalStorageManager {
       // Validate and transform the data before saving
       const validatedData = validateAndTransformGameData<GameSaveData>({
         ...data,
-        lastSaved: Date.now()
+        lastSaved: Date.now(),
       });
-      
+
       // Update the current data cache
       this.currentData = this.deepClone(validatedData);
-      
+
       // Ensure we don't save circular references
       const serializableData = this.prepareForSerialization(validatedData);
-      
+
       // Save to localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableData));
-      
+
       console.log(`[Storage] Game state saved at ${new Date().toISOString()}`);
       return true;
     } catch (error) {
@@ -240,11 +247,11 @@ class LocalStorageManager {
       return false;
     }
   }
-  
+
   /**
    * Asynchronously saves the current game state to localStorage.
    * Updates the lastSaved timestamp before saving.
-   * 
+   *
    * @param {GameSaveData} data - The complete game state to save
    * @returns {Promise<boolean>} A promise that resolves to true if save was successful, false otherwise
    * @throws Will log errors to console if saving fails
@@ -254,18 +261,18 @@ class LocalStorageManager {
       // Validate and transform the data before saving
       const validatedData = validateAndTransformGameData<GameSaveData>({
         ...data,
-        lastSaved: Date.now()
+        lastSaved: Date.now(),
       });
-      
+
       // Update the current data cache
       this.currentData = this.deepClone(validatedData);
-      
+
       // Ensure we don't save circular references
       const serializableData = this.prepareForSerialization(validatedData);
-      
+
       // Save to localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableData));
-      
+
       console.log('[Storage] Game state saved successfully');
       return true;
     } catch (error) {
@@ -278,7 +285,7 @@ class LocalStorageManager {
    * Creates a deep clone of the current game data.
    * Uses JSON parse/stringify for simplicity and to ensure a complete deep copy.
    * For more complex objects, consider using a library like lodash's cloneDeep.
-   * 
+   *
    * @private
    * @template T
    * @param {T} obj - The object to clone
@@ -290,8 +297,8 @@ class LocalStorageManager {
    */
   private prepareForSerialization<T>(obj: T): T {
     const seen = new WeakSet();
-    
-    const replacer = (_: string, value: any) => {
+
+    const replacer = (_: string, value: unknown) => {
       // Handle circular references
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) {
@@ -299,7 +306,7 @@ class LocalStorageManager {
         }
         seen.add(value);
       }
-      
+
       // Convert any non-serializable values to strings
       if (value instanceof Error) {
         return { message: value.message, stack: value.stack };
@@ -310,12 +317,12 @@ class LocalStorageManager {
       } else if (value instanceof Date) {
         return value.toISOString();
       } else if (value && typeof value === 'object' && 'toJSON' in value) {
-        return value.toJSON();
+        return (value as { toJSON: () => unknown }).toJSON();
       }
-      
+
       return value;
     };
-    
+
     return JSON.parse(JSON.stringify(obj, replacer));
   }
 
@@ -324,50 +331,53 @@ class LocalStorageManager {
    */
   private deepClone<T>(obj: T): T {
     try {
-      return JSON.parse(JSON.stringify(obj, (_, value) => {
-        // Handle special cases for non-serializable values
-        if (value instanceof Map) {
-          return { __type: 'Map', value: Array.from(value.entries()) };
-        } else if (value instanceof Set) {
-          return { __type: 'Set', value: Array.from(value) };
-        } else if (value instanceof Date) {
-          return { __type: 'Date', value: value.toISOString() };
-        }
-        return value;
-      }));
+      return JSON.parse(
+        JSON.stringify(obj, (_, value) => {
+          // Handle special cases for non-serializable values
+          if (value instanceof Map) {
+            return { __type: 'Map', value: Array.from(value.entries()) };
+          } else if (value instanceof Set) {
+            return { __type: 'Set', value: Array.from(value) };
+          } else if (value instanceof Date) {
+            return { __type: 'Date', value: value.toISOString() };
+          }
+          return value;
+        })
+      );
     } catch (error) {
       console.error('Error cloning object:', error);
       // Fallback to shallow clone if deep clone fails
-      return { ...obj as any } as T;
+      if (typeof obj === 'object' && obj !== null) {
+        return { ...(obj as Record<string, unknown>) } as T;
+      }
+      return obj;
     }
   }
 
   /**
    * Gets a deep, read-only copy of the current game data.
    * Prevents modification of the internal state, including nested objects.
-   * 
+   *
    * @returns {Readonly<GameSaveData>} An immutable deep copy of the current game data
    */
   public getCurrentData(): Readonly<GameSaveData> {
     return this.deepClone(this.currentData);
   }
 
-
   /**
    * Exports the current game data as a JSON string.
    * Useful for save file exports or debugging.
-   * 
+   *
    * @returns {string} A formatted JSON string of the current game data
    */
   public exportData(): string {
     return JSON.stringify(this.currentData, null, 2);
   }
 
-
   /**
    * Imports game data from a JSON string.
    * Validates and transforms the imported data before applying it.
-   * 
+   *
    * @param {string} jsonString - JSON string containing the game data to import
    * @returns {boolean} True if import was successful, false otherwise
    * @throws Will log errors to console if the import fails
@@ -384,19 +394,16 @@ class LocalStorageManager {
     }
   }
 
-
   /**
    * Resets all game data to default values.
    * Useful for new game functionality or error recovery.
-   * 
+   *
    * @returns {boolean} True if reset was successful, false otherwise
    */
   public resetToDefaults(): boolean {
     this.currentData = validateAndTransformGameData<GameSaveData>({ ...DEFAULT_SAVE_DATA });
     return this.save(this.currentData);
   }
-
-
 }
 
 // Export a singleton instance

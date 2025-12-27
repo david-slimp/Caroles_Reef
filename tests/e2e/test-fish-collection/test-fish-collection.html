@@ -106,7 +106,7 @@
       // Clear collection
       document.getElementById('clearCollection').addEventListener('click', () => {
         if (confirm('Are you sure you want to clear the entire fish collection?')) {
-          localStorage.removeItem('caroles_reef_saved_fish');
+          localStorage.removeItem('caroles_reef_save_data');
           if (window.fishCollection) {
             window.fishCollection.refreshCollection();
           }
@@ -120,8 +120,9 @@
         const container = document.getElementById('storageContents');
         
         try {
-          const savedFish = JSON.parse(localStorage.getItem('caroles_reef_saved_fish') || '[]');
-          storageEl.textContent = JSON.stringify(savedFish, null, 2);
+          const savedData = JSON.parse(localStorage.getItem('caroles_reef_save_data') || '{}');
+          const savedFish = Array.isArray(savedData.fishCollection) ? savedData.fishCollection : [];
+          storageEl.textContent = JSON.stringify(savedData, null, 2);
           container.style.display = 'block';
           updateStatus('Showing storage contents');
         } catch (error) {

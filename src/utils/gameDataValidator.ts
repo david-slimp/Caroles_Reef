@@ -18,6 +18,10 @@ export const DEFAULT_SAVE_DATA: GameSaveData = {
     uiScale: 1.0,
   },
   fish: [],
+  fishCollection: [],
+  tankFish: [],
+  fishInTank: [],
+  fishInTankOriginalIds: [],
   tank: {
     background: 'default',
     decorations: [],
@@ -28,10 +32,12 @@ export const DEFAULT_SAVE_DATA: GameSaveData = {
   },
 };
 
+type UnknownRecord = Record<string, unknown>;
+
 /**
  * Validates and transforms game data to ensure it matches the current expected format.
  * This function should be called both when loading data from storage and before saving.
- * 
+ *
  * @template T The expected return type (defaults to GameSaveData)
  * @param {any} data - The game data to validate and transform
  * @param {number} [timestamp=Math.floor(Date.now() / 1000)] - Optional timestamp in seconds. Defaults to current time.
@@ -39,16 +45,15 @@ export const DEFAULT_SAVE_DATA: GameSaveData = {
  * @throws {Error} If the input data is invalid or cannot be transformed
  */
 export function validateAndTransformGameData<T = GameSaveData>(
-  data: any,
+  data: unknown,
   timestamp: number = Math.floor(Date.now() / 1000)
 ): T {
-
   if (!data || typeof data !== 'object') {
     throw new Error('Invalid game data: must be an object');
   }
 
   // Start with a shallow copy to avoid mutating the input
-  const validated: any = { ...data };
+  const validated: UnknownRecord = { ...(data as UnknownRecord) };
 
   // Ensure required top-level fields exist
   if (typeof validated.version !== 'string') {
@@ -59,7 +64,7 @@ export function validateAndTransformGameData<T = GameSaveData>(
   if (!validated.gameState || typeof validated.gameState !== 'object') {
     validated.gameState = {};
   }
-  
+
   // Ensure gameTime is a positive number
   if (typeof validated.gameState.gameTime !== 'number' || validated.gameState.gameTime < 0) {
     validated.gameState.gameTime = 0;
@@ -77,7 +82,9 @@ export function validateAndTransformGameData<T = GameSaveData>(
 
   // Transform and validate fish data
   if (Array.isArray(validated.fish)) {
-    validated.fish = validated.fish.map((fish: FishData) => validateAndTransformFish(fish, timestamp));
+    validated.fish = validated.fish.map((fish: FishData) =>
+      validateAndTransformFish(fish, timestamp)
+    );
   } else {
     validated.fish = [];
   }
@@ -91,11 +98,28 @@ export function validateAndTransformGameData<T = GameSaveData>(
     validated.fishCollection = [];
   }
 
+  // Transform and validate tank fish data
+  if (Array.isArray(validated.tankFish)) {
+    validated.tankFish = validated.tankFish
+      .map((fish: FishData) => validateAndTransformFish(fish, timestamp))
+      .filter(Boolean);
+  } else {
+    validated.tankFish = [];
+  }
+
+  if (!Array.isArray(validated.fishInTank)) {
+    validated.fishInTank = [];
+  }
+
+  if (!Array.isArray(validated.fishInTankOriginalIds)) {
+    validated.fishInTankOriginalIds = [];
+  }
+
   // Transform and validate tank data
   if (!validated.tank || typeof validated.tank !== 'object') {
     validated.tank = { background: 'default', decorations: [] };
   }
-  
+
   if (!Array.isArray(validated.tank.decorations)) {
     validated.tank.decorations = [];
   }
@@ -104,11 +128,11 @@ export function validateAndTransformGameData<T = GameSaveData>(
   if (!validated.progress || typeof validated.progress !== 'object') {
     validated.progress = { unlocked: [], flags: {} };
   }
-  
+
   if (!Array.isArray(validated.progress.unlocked)) {
     validated.progress.unlocked = [];
   }
-  
+
   if (!validated.progress.flags || typeof validated.progress.flags !== 'object') {
     validated.progress.flags = {};
   }
@@ -132,7 +156,7 @@ interface FishGenes {
   pattern?: string;
   finType?: string;
   eyeType?: string;
-  [key: string]: any; // For backward compatibility with additional properties
+  [key: string]: unknown; // For backward compatibility with additional properties
 }
 
 /**
@@ -158,7 +182,7 @@ interface FishData {
   shiny?: boolean;
   favorite?: boolean;
   genes?: FishGenes;
-  [key: string]: any; // For backward compatibility with additional properties
+  [key: string]: unknown; // For backward compatibility with additional properties
 }
 
 /**
@@ -171,13 +195,13 @@ interface FishCollectionItem {
   name?: string;
   saveDate?: string;
   species?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
  * Validates and transforms a single fish object to ensure it matches the expected structure.
  * Handles migration of legacy formats, sets defaults, and ensures all values are within valid ranges.
- * 
+ *
  * @param {any} fish - The fish data to validate and transform
  * @param {number} timestamp - Current timestamp in seconds for age calculations
  * @returns {FishData | null} Transformed fish object or null if fish is invalid or dead
@@ -189,20 +213,21 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     // Ensure the default fish matches our FishData type
     return {
       ...defaultFish,
-      sex: (defaultFish.sex === 'M' || defaultFish.sex === 'F') ? defaultFish.sex : 'M',
-      genes: defaultFish.genes || {}
+      sex: defaultFish.sex === 'M' || defaultFish.sex === 'F' ? defaultFish.sex : 'M',
+      genes: defaultFish.genes || {},
     };
   }
-  
+
   // Type assertion for the input fish object
   const inputFish = fish as Partial<FishData>;
-  
+
   // Handle legacy fish format (pre-gene system)
   let fishWithLegacyCheck = { ...inputFish };
-  const legacySpeed = typeof fishWithLegacyCheck.speed === 'number' && fishWithLegacyCheck.speed <= 2;
-  const hasLegacyAppearance = ('color' in fishWithLegacyCheck) || ('pattern' in fishWithLegacyCheck);
+  const legacySpeed =
+    typeof fishWithLegacyCheck.speed === 'number' && fishWithLegacyCheck.speed <= 2;
+  const hasLegacyAppearance = 'color' in fishWithLegacyCheck || 'pattern' in fishWithLegacyCheck;
   if (!fishWithLegacyCheck.genes && (hasLegacyAppearance || legacySpeed)) {
-    fishWithLegacyCheck = migrateLegacyFish(fishWithLegacyCheck as Record<string, any>);
+    fishWithLegacyCheck = migrateLegacyFish(fishWithLegacyCheck as UnknownRecord);
   }
 
   // Create a new validated object with proper typing
@@ -215,32 +240,44 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   }
 
   // Basic properties with proper typing
-  validated.name = typeof validated.name === 'string' && validated.name.trim() ? validated.name : 'Unnamed';
-  validated.species = typeof validated.species === 'string' && validated.species.trim() ? validated.species : 'default';
-  validated.sex = (validated.sex === 'M' || validated.sex === 'F') ? validated.sex : (Math.random() < 0.5 ? 'M' : 'F');
-  
+  validated.name =
+    typeof validated.name === 'string' && validated.name.trim() ? validated.name : 'Unnamed';
+  validated.species =
+    typeof validated.species === 'string' && validated.species.trim()
+      ? validated.species
+      : 'default';
+  validated.sex =
+    validated.sex === 'M' || validated.sex === 'F'
+      ? validated.sex
+      : Math.random() < 0.5
+        ? 'M'
+        : 'F';
+
   // Position and movement
   validated.x = typeof validated.x === 'number' ? validated.x : 50;
-  validated.y = (typeof validated.y === 'number' && validated.y > 150) ? validated.y : 160;
+  validated.y = typeof validated.y === 'number' && validated.y > 150 ? validated.y : 160;
   validated.vx = typeof validated.vx === 'number' ? validated.vx : 0;
   validated.vy = typeof validated.vy === 'number' ? validated.vy : 0;
   validated.dir = typeof validated.dir === 'number' ? validated.dir : 0;
-  
+
   // Size and growth
   validated.size = typeof validated.size === 'number' && validated.size > 0 ? validated.size : 6;
-  validated.maxSize = typeof validated.maxSize === 'number' && validated.maxSize > 0 ? 
-    Math.max(validated.maxSize, validated.size) : Math.max(validated.size, 30);
-  validated.birthSize = typeof validated.birthSize === 'number' && validated.birthSize > 0 ? 
-    validated.birthSize : Math.min(5, validated.size);
-  
+  validated.maxSize =
+    typeof validated.maxSize === 'number' && validated.maxSize > 0
+      ? Math.max(validated.maxSize, validated.size)
+      : Math.max(validated.size, 30);
+  validated.birthSize =
+    typeof validated.birthSize === 'number' && validated.birthSize > 0
+      ? validated.birthSize
+      : Math.min(5, validated.size);
+
   // Age and life stage
   // Handle age and birthTime
   if (typeof validated.birthTime === 'number') {
     // Convert ms to s if needed (legacy)
-    validated.birthTime = validated.birthTime > 1e12 
-      ? Math.floor(validated.birthTime / 1000) 
-      : validated.birthTime;
-    
+    validated.birthTime =
+      validated.birthTime > 1e12 ? Math.floor(validated.birthTime / 1000) : validated.birthTime;
+
     // Recalculate age in minutes with one decimal place
     const ageInSeconds = timestamp - validated.birthTime;
     validated.age = Math.round((ageInSeconds / 60) * 10) / 10; // One decimal place
@@ -253,10 +290,9 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     validated.birthTime = timestamp;
     validated.age = 0;
   }
-  
+
   // Ensure age is never negative
   validated.age = Math.max(0, validated.age);
-  
 
   // State handling
   validated.dead = validated.state === 'dead';
@@ -268,25 +304,30 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   validated.state = 'wander';
   validated.shiny = !!validated.shiny;
   validated.favorite = !!validated.favorite;
-  
+
   // Initialize genes if missing
   if (!validated.genes || typeof validated.genes !== 'object') {
     validated.genes = {} as FishGenes;
   }
-  
+
   // Gene validations
   const genes = validated.genes;
-  
+
   // Migrate old senseRadius to senseGene if needed
-  if (typeof genes.senseGene !== 'number' || !Number.isInteger(genes.senseGene) || genes.senseGene < 1 || genes.senseGene > 9) {
-  // If we have a legacy senseRadius, convert it to senseGene.
+  if (
+    typeof genes.senseGene !== 'number' ||
+    !Number.isInteger(genes.senseGene) ||
+    genes.senseGene < 1 ||
+    genes.senseGene > 9
+  ) {
+    // If we have a legacy senseRadius, convert it to senseGene.
     if ('senseRadius' in validated) {
-      const radiusValue = Number((validated as any).senseRadius);
+      const radiusValue = Number((validated as UnknownRecord).senseRadius);
       const normalized = radiusValue < 10 ? radiusValue : Math.round(radiusValue / 20);
       genes.senseGene = clampSenseGene(normalized);
       delete validated.senseRadius;
     } else if ('senseRadius' in genes) {
-      const radiusValue = Number((genes as any).senseRadius);
+      const radiusValue = Number((genes as UnknownRecord).senseRadius);
       const normalized = radiusValue < 10 ? radiusValue : Math.round(radiusValue / 20);
       genes.senseGene = clampSenseGene(normalized);
       delete genes.senseRadius;
@@ -297,14 +338,20 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   }
   // Always drop legacy senseRadius if it exists after normalization
   if ('senseRadius' in validated) {
-    delete (validated as any).senseRadius;
+    delete (validated as UnknownRecord).senseRadius;
   }
   if ('senseRadius' in genes) {
-    delete (genes as any).senseRadius;
+    delete (genes as UnknownRecord).senseRadius;
   }
-  
+
   // Gene ranges (0-9 for all genes)
-  const geneKeys: Array<keyof FishGenes> = ['speed', 'senseGene', 'hungerDrive', 'rarityGene', 'constitution'];
+  const geneKeys: Array<keyof FishGenes> = [
+    'speed',
+    'senseGene',
+    'hungerDrive',
+    'rarityGene',
+    'constitution',
+  ];
   geneKeys.forEach(key => {
     if (key in genes && genes[key] !== undefined) {
       // We know these are number properties based on our FishGenes interface
@@ -313,14 +360,14 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
         genes[key] = key === 'senseGene' ? clampSenseGene(value) : clampGene(value);
       } else {
         // If somehow it's not a number, set to default
-        (genes as any)[key] = 5;
+        (genes as UnknownRecord)[key] = 5;
       }
     } else {
       // Set default gene value if missing
-      (genes as any)[key] = 5; // Mid-range default
+      (genes as UnknownRecord)[key] = 5; // Mid-range default
     }
   });
-  
+
   // If top-level appearance fields exist and genes are missing, use top-level values.
   if (typeof validated.colorHue === 'number' && typeof genes.colorHue !== 'number') {
     genes.colorHue = validated.colorHue;
@@ -341,22 +388,22 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   } else {
     genes.colorHue = Math.random() * 360; // Random hue if not specified
   }
-  
+
   // Patterns and features
   const validPatterns = ['solid', 'stripes', 'spots', 'gradient'];
   const validFins = ['pointy', 'round', 'fan', 'forked', 'lunate'];
   const validEyes = ['round', 'sleepy', 'sparkly', 'winking'];
-  
+
   // Ensure valid pattern and appearance types with type safety
   const patternType = typeof genes.patternType === 'string' ? genes.patternType : 'solid';
   genes.patternType = validPatterns.includes(patternType) ? patternType : 'solid';
-  
+
   const finShape = typeof genes.finShape === 'string' ? genes.finShape : 'fan';
   genes.finShape = validFins.includes(finShape) ? finShape : 'fan';
-  
+
   const eyeType = typeof genes.eyeType === 'string' ? genes.eyeType : 'round';
   genes.eyeType = validEyes.includes(eyeType) ? eyeType : 'round';
-  
+
   // Backward compatibility for top-level finShape
   if (validFins.includes(validated.finShape)) {
     genes.finShape = validated.finShape;
@@ -364,14 +411,21 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   }
 
   // Normalize top-level gene fields to match validated genes
-  const topLevelGenes: Array<keyof FishGenes> = ['speed', 'senseGene', 'hungerDrive', 'rarityGene', 'constitution'];
-  topLevelGenes.forEach((key) => {
+  const topLevelGenes: Array<keyof FishGenes> = [
+    'speed',
+    'senseGene',
+    'hungerDrive',
+    'rarityGene',
+    'constitution',
+  ];
+  topLevelGenes.forEach(key => {
     if (typeof validated[key] === 'number') {
-      validated[key] = key === 'senseGene' ? clampSenseGene(validated[key]) : clampGene(validated[key]);
+      validated[key] =
+        key === 'senseGene' ? clampSenseGene(validated[key]) : clampGene(validated[key]);
     } else {
-      (validated as any)[key] = genes[key];
+      (validated as UnknownRecord)[key] = genes[key];
     }
-    genes[key] = (validated as any)[key];
+    (genes as UnknownRecord)[key] = (validated as UnknownRecord)[key];
   });
 
   // Normalize top-level appearance fields to match validated genes
@@ -379,7 +433,7 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   validated.patternType = genes.patternType;
   validated.finShape = genes.finShape;
   validated.eyeType = genes.eyeType;
-  
+
   // Ensure canMate is a boolean (default: true)
   if (typeof validated.canMate !== 'boolean') {
     validated.canMate = true;
@@ -392,14 +446,14 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
 
   // Ensure lastUpdate is current
   validated.lastUpdate = Date.now();
-  
+
   // Ensure all required arrays exist
   validated._bites = Array.isArray(validated._bites) ? validated._bites : [];
-  
+
   // Ensure timers are valid numbers
   validated._ritualTimer = typeof validated._ritualTimer === 'number' ? validated._ritualTimer : 0;
   validated._breedCd = typeof validated._breedCd === 'number' ? validated._breedCd : 0;
-  
+
   return validated;
 }
 
@@ -421,27 +475,26 @@ function validateAndTransformFishCollectionItem(
     return null;
   }
 
-  const resolvedId = typeof input.id === 'string' && input.id
-    ? input.id
-    : validatedFish.id;
-  const resolvedTimestamp = typeof input.timestamp === 'number'
-    ? input.timestamp
-    : Date.now();
+  const resolvedId = typeof input.id === 'string' && input.id ? input.id : validatedFish.id;
+  const resolvedTimestamp = typeof input.timestamp === 'number' ? input.timestamp : Date.now();
 
   return {
     ...input,
     id: resolvedId,
-    name: typeof input.name === 'string' && input.name.trim()
-      ? input.name
-      : validatedFish.name || 'Unnamed',
-    species: typeof input.species === 'string' && input.species.trim()
-      ? input.species
-      : validatedFish.species || 'default',
-    saveDate: typeof input.saveDate === 'string' && input.saveDate
-      ? input.saveDate
-      : new Date(resolvedTimestamp).toISOString(),
+    name:
+      typeof input.name === 'string' && input.name.trim()
+        ? input.name
+        : validatedFish.name || 'Unnamed',
+    species:
+      typeof input.species === 'string' && input.species.trim()
+        ? input.species
+        : validatedFish.species || 'default',
+    saveDate:
+      typeof input.saveDate === 'string' && input.saveDate
+        ? input.saveDate
+        : new Date(resolvedTimestamp).toISOString(),
     timestamp: resolvedTimestamp,
-    fishData: validatedFish
+    fishData: validatedFish,
   };
 }
 
@@ -451,7 +504,7 @@ function validateAndTransformFishCollectionItem(
 function createDefaultFish() {
   const now = Date.now();
   const hue = Math.floor(Math.random() * 360);
-  
+
   return {
     id: `fish-${now}-${Math.random().toString(36).substr(2, 9)}`,
     name: 'Unnamed',
@@ -482,17 +535,17 @@ function createDefaultFish() {
       colorHue: hue,
       patternType: 'solid',
       finShape: 'fan',
-      eyeType: 'round'
+      eyeType: 'round',
     },
     phenotype: {
       visual: {},
-      behavior: {}
+      behavior: {},
     },
     // Initialize empty arrays for later use
     _bites: [],
     _ritualTimer: 0,
     _breedCd: 0,
-    _mateId: null
+    _mateId: null,
   };
 }
 
@@ -505,14 +558,14 @@ function createDefaultFish() {
  * @param {any} fish - The legacy fish object to migrate
  * @returns {FishData} The migrated fish object in the current format
  */
-function migrateLegacyFish(fish: Record<string, any>): FishData {
+function migrateLegacyFish(fish: UnknownRecord): FishData {
   const migrated = { ...fish };
-  
+
   // Initialize genes if they don't exist
   if (!migrated.genes) {
-    migrated.genes = {} as any;
+    migrated.genes = {} as FishGenes;
   }
-  
+
   // Migrate color
   if (migrated.color && !migrated.genes.colorHue) {
     // Convert hex to hue (simplified)
@@ -521,47 +574,53 @@ function migrateLegacyFish(fish: Record<string, any>): FishData {
       const r = parseInt(hex.substr(0, 2), 16) / 255;
       const g = parseInt(hex.substr(2, 2), 16) / 255;
       const b = parseInt(hex.substr(4, 2), 16) / 255;
-      
+
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       let h = 0;
-      
+
       if (max === min) {
         h = 0; // achromatic
       } else {
         const d = max - min;
         switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          case b:
+            h = (r - g) / d + 4;
+            break;
         }
         h /= 6;
       }
-      
+
       migrated.genes.colorHue = Math.round(h * 360);
     }
     delete migrated.color;
   }
-  
+
   // Migrate pattern
   if (migrated.pattern && !migrated.genes.patternType) {
     migrated.genes.patternType = migrated.pattern;
     delete migrated.pattern;
   }
-  
+
   // Migrate speed
   if (typeof migrated.speed === 'number' && !migrated.genes.speed) {
     // Convert speed (0-2 range) to gene (0-9 range)
     migrated.genes.speed = Math.min(9, Math.max(0, Math.round(migrated.speed * 4.5)));
     delete migrated.speed;
   }
-  
+
   // Migrate finShape
   if (migrated.finShape && !migrated.genes.finShape) {
     migrated.genes.finShape = migrated.finShape;
     // Don't delete finShape as it might be used directly in some places
   }
-  
+
   return migrated;
 }
 
@@ -569,18 +628,20 @@ function migrateLegacyFish(fish: Record<string, any>): FishData {
  * Clamps a gene value to an integer within the specified range (0-9 by default).
  * Ensures the result is always an integer, even if non-integer min/max are provided.
  */
-function clampGene(value: any, min: number = 0, max: number = 9): number {
+function clampGene(value: unknown, min: number = 0, max: number = 9): number {
   // Ensure min and max are integers
   const intMin = Math.max(0, Math.min(9, Math.round(Number(min) || 0)));
   const intMax = Math.min(9, Math.max(0, Math.round(Number(max) || 9)));
-  
+
   // Ensure min <= max
   const [actualMin, actualMax] = intMin <= intMax ? [intMin, intMax] : [intMax, intMin];
-  
+
   // Parse and round the input value, defaulting to mid-range if invalid
-  const num = typeof value === 'number' && !isNaN(value) ? Math.round(Number(value)) : 
-             Math.round((actualMin + actualMax) / 2);
-              
+  const num =
+    typeof value === 'number' && !isNaN(value)
+      ? Math.round(Number(value))
+      : Math.round((actualMin + actualMax) / 2);
+
   // Clamp to the valid range
   return Math.min(actualMax, Math.max(actualMin, num));
 }
@@ -588,7 +649,7 @@ function clampGene(value: any, min: number = 0, max: number = 9): number {
 /**
  * Clamps senseGene to the valid range (1-9).
  */
-function clampSenseGene(value: any): number {
+function clampSenseGene(value: unknown): number {
   return clampGene(value, 1, 9);
 }
 
@@ -596,5 +657,5 @@ export default {
   validateAndTransformGameData,
   validateAndTransformFish,
   validateAndTransformFishCollectionItem,
-  migrateLegacyFish
+  migrateLegacyFish,
 };

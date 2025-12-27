@@ -3,9 +3,9 @@
  * Fish Card UI extracted from legacy code.
  * Exposes showFishCard() and refreshIfVisible() while keeping behavior identical.
  */
-import { playSound, Sounds } from '../utils/audio';
 import { isAdult } from '../entities/fish';
 import { gameState } from '../state/GameState';
+import { playSound, Sounds } from '../utils/audio';
 
 type Deps = {
   fish: any[];
@@ -17,10 +17,12 @@ type Deps = {
 export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps) {
   let selectedFish: any = null;
   const breedingHud = ensureBreedingHud();
+  let showBreedingHud = false;
 
   function closeCard() {
     fishCardEl.style.display = 'none';
     breedingHud.style.display = 'none';
+    showBreedingHud = false;
     if (selectedFish) selectedFish.selected = false;
     selectedFish = null;
   }
@@ -28,7 +30,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
   function refreshFishCard() {
     if (!selectedFish || fishCardEl.style.display !== 'block') return;
     const f = selectedFish;
-    const stillThere = fish.find((x) => x.id === f.id);
+    const stillThere = fish.find(x => x.id === f.id);
     if (!stillThere) return closeCard();
 
     // Helpers
@@ -38,7 +40,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     byId('#fc-name').textContent = f.name || 'Unnamed Fish';
     byId('#fc-sex').textContent = f.sex;
 
-    const stage = f.dead ? 'Dead' : (isAdult(f) ? 'Adult' : 'Young');
+    const stage = f.dead ? 'Dead' : isAdult(f) ? 'Adult' : 'Young';
     byId('#fc-stage').textContent = stage;
 
     const shinyEl = byId('#fc-shiny');
@@ -54,20 +56,23 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     byId('#fc-appearance').textContent =
       `Hue: ${f.colorHue} | Pattern: ${f.patternType} | Fin: ${f.finShape} | Eye: ${f.eyeType}`;
 
-    byId('#fc-parents').textContent =
-      f.parents ? `Parents: ${f.parents.ma} × ${f.parents.pa}` : '— wild origin —';
+    byId('#fc-parents').textContent = f.parents
+      ? `Parents: ${f.parents.ma} × ${f.parents.pa}`
+      : '— wild origin —';
 
     favBtn.textContent = f.favorite ? '★' : '☆';
     (favBtn as any).style.color = f.favorite ? '#ffd700' : '#888';
     favBtn.setAttribute('title', f.favorite ? 'Remove from favorites' : 'Add to favorites');
 
-    updateBreedingHud(f, fish);
+    if (showBreedingHud) {
+      updateBreedingHud(f, fish);
+    }
   }
 
   async function showFishCard(f: any) {
     selectedFish = f;
     // Clear selection ring
-    fish.forEach((ff) => (ff.selected = false));
+    fish.forEach(ff => (ff.selected = false));
     f.selected = true;
 
     fishCardEl.style.display = 'block';
@@ -82,6 +87,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
         <span class="badge" id="fc-sex">${f.sex}</span>
         <span class="badge" id="fc-stage"></span>
         <span class="badge" id="fc-shiny" style="display:${f.shiny ? 'inline' : 'none'}">✨ Shiny</span>
+        <button id="toggleBreedingHud" style="margin-left:auto; background:#1f3a4d; border:1px solid #2a4a6a; color:#cfe9ff; border-radius:6px; padding:2px 8px; cursor:pointer; font-size:11px;">Breeding</button>
       </div>
 
       <div class="small">ID: <span id="fc-id"></span></div>
@@ -110,6 +116,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     const favBtn = fishCardEl.querySelector('#toggleFav') as HTMLButtonElement;
     const releaseBtn = fishCardEl.querySelector('#releaseFish') as HTMLButtonElement;
     const saveToCollectionBtn = fishCardEl.querySelector('#saveToCollection') as HTMLButtonElement;
+    const breedingBtn = fishCardEl.querySelector('#toggleBreedingHud') as HTMLButtonElement;
 
     save.onclick = async () => {
       const newName = input.value.trim();
@@ -138,7 +145,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       }
       refreshFishCard();
     };
-    input.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
         save.click();
@@ -147,14 +154,23 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
 
     close.onclick = () => closeCard();
 
-    favBtn.onclick = (e) => {
+    breedingBtn.onclick = () => {
+      showBreedingHud = !showBreedingHud;
+      if (showBreedingHud) {
+        updateBreedingHud(f, fish);
+      } else {
+        breedingHud.style.display = 'none';
+      }
+    };
+
+    favBtn.onclick = e => {
       e.stopPropagation();
       f.favorite = !f.favorite;
       toast(f.favorite ? 'Added to favorites' : 'Removed from favorites');
       refreshFishCard();
     };
 
-    saveToCollectionBtn.onclick = async (e) => {
+    saveToCollectionBtn.onclick = async e => {
       e.stopPropagation();
       try {
         const fishData: any = {
@@ -202,20 +218,20 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     releaseBtn.onclick = () => {
       if (!selectedFish) return;
       playSound(Sounds.release, { fadeOutDuration: 1000 });
-      const index = fish.findIndex((x) => x.id === selectedFish.id);
+      const index = fish.findIndex(x => x.id === selectedFish.id);
       if (index !== -1) {
         tankFishIds.delete(selectedFish.originalId || selectedFish.id);
         fish.splice(index, 1);
         const currentState = gameState.getState();
         const fishInTank = [...(currentState.fishInTank || [])];
         const fishInTankOriginalIds = [...(currentState.fishInTankOriginalIds || [])];
-        const fishIndex = fishInTank.findIndex((fishId) => fishId === selectedFish.id);
+        const fishIndex = fishInTank.findIndex(fishId => fishId === selectedFish.id);
         if (fishIndex >= 0) {
           fishInTank.splice(fishIndex, 1);
         }
         const originalId = selectedFish.originalId;
         if (originalId) {
-          const originalIndex = fishInTankOriginalIds.findIndex((savedId) => savedId === originalId);
+          const originalIndex = fishInTankOriginalIds.findIndex(savedId => savedId === originalId);
           if (originalIndex >= 0) {
             fishInTankOriginalIds.splice(originalIndex, 1);
           }
@@ -254,14 +270,14 @@ function updateBreedingHud(f: any, tankFish: any[]): void {
   const mate = f._mateId ? tankFish.find((m: any) => m.id === f._mateId) : null;
   const mateDistance = mate ? Math.hypot(mate.x - f.x, mate.y - f.y) : null;
   const senseRadius = typeof f.senseGene === 'number' ? f.senseGene * 20 : 0;
-  const hungerRadius = typeof f.senseGene === 'number'
-    ? f.senseGene * ((f.hungerDrive || 0) * 2.1) + 5
-    : 0;
+  const hungerRadius =
+    typeof f.senseGene === 'number' ? f.senseGene * ((f.hungerDrive || 0) * 2.1) + 5 : 0;
   const adultAgeSec = 4 * 60;
   const adultSize = (f.maxSize || 30) * 0.5;
-  const isAdult = typeof f.age === 'number' && typeof f.size === 'number'
-    ? f.age >= adultAgeSec && f.size >= adultSize
-    : false;
+  const isAdult =
+    typeof f.age === 'number' && typeof f.size === 'number'
+      ? f.age >= adultAgeSec && f.size >= adultSize
+      : false;
   const ageRemaining = typeof f.age === 'number' ? Math.max(0, adultAgeSec - f.age) : null;
   const sizeRemaining = typeof f.size === 'number' ? Math.max(0, adultSize - f.size) : null;
   const maxFish = 60;

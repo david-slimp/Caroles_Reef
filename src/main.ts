@@ -29,11 +29,11 @@ async function initGame() {
   try {
     // Start the legacy game (it owns rAF, canvas, inputs, UI)
     await runLegacyGame('c');
-    
+
     // Start background music after user interaction
     // The actual playback is now handled by the audio system after user interaction
     // and respects the mute state set by the user
-    
+
     // Optional: expose for quick debugging
     // @ts-expect-error - debug only
     window.__GAME__ = { bus, _audio };
@@ -49,7 +49,8 @@ async function initGame() {
     errorEl.style.backgroundColor = '#ffebee';
     errorEl.style.color = '#b71c1c';
     errorEl.style.zIndex = '1000';
-    errorEl.textContent = 'Error initializing game. Please refresh the page or contact support if the problem persists.';
+    errorEl.textContent =
+      'Error initializing game. Please refresh the page or contact support if the problem persists.';
     document.body.prepend(errorEl);
   }
 }

@@ -25,8 +25,8 @@ export function updatePellets(pellets: Pellet[], dt: number, H: number) {
 }
 
 export function drawPellets(ctx: CanvasRenderingContext2D, pellets: Pellet[]) {
-  ctx.fillStyle = "rgba(255,200,80,0.95)";
-  pellets.forEach((p) => {
+  ctx.fillStyle = 'rgba(255,200,80,0.95)';
+  pellets.forEach(p => {
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fill();
