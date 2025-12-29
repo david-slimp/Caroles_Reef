@@ -76,13 +76,17 @@ export interface GameSaveData {
   fishCollection?: Array<{
     id: string;
     fishData: Record<string, unknown>;
-    timestamp: number;
+    lastSaved: number;
   }>;
 
   // Live tank fish snapshot (includes non-collection fish)
   tankFish?: Array<Record<string, unknown>>;
   fishInTank?: string[];
   fishInTankOriginalIds?: string[];
+
+  // Inventory filter presets
+  inventoryPresets?: InventoryPreset[];
+  selectedInventoryPresetId?: string | null;
 
   // Tank state
   tank: {
@@ -105,6 +109,21 @@ export interface GameSaveData {
     /** Game progress flags */
     flags: Record<string, boolean>;
   };
+}
+
+export type InventoryFilterRule =
+  | { type: 'set' | 'number-set'; excluded: string[] }
+  | { type: 'number-range'; min: number | null; max: number | null }
+  | { type: 'text'; query: string };
+
+export interface InventoryPreset {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  filters: Record<string, InventoryFilterRule>;
+  columnOrder: string[];
+  columnVisibility: Record<string, boolean>;
+  sort: { column: string; direction: 'asc' | 'desc' } | null;
 }
 
 /** Storage key for game data */
@@ -185,7 +204,7 @@ class LocalStorageManager {
             result.fishCollection = result.fish.map((fish: LegacyFish) => ({
               id: fish.id || `fish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               fishData: fish,
-              timestamp: Date.now(),
+              lastSaved: Date.now(),
             }));
             console.log(
               `[Storage] Migrated ${result.fishCollection.length} fish from legacy format`

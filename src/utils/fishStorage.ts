@@ -14,9 +14,8 @@ import { gameState } from '../state/GameState';
  * @property {any} fishData - Serialized fish data.
  * @property {string} [thumbnail] - Base64 encoded thumbnail (optional).
  * @property {string} species - Fish species/type.
- * @property {string} [rarity] - Rarity/quality (optional).
  * @property {number} [generation] - Generation number (optional).
- * @property {number} timestamp - Timestamp for sorting/versioning.
+ * @property {number} lastSaved - Timestamp for sorting/versioning.
  */
 export interface SavedFish {
   id: string;
@@ -25,20 +24,18 @@ export interface SavedFish {
   fishData: FishData;
   thumbnail?: string;
   species: string;
-  rarity?: string;
   generation?: number;
-  timestamp: number;
+  lastSaved: number;
 }
 
 // Type for fish data as stored in LocalStorageManager
 interface StoredFish {
   id: string;
   fishData: FishData;
-  timestamp: number;
+  lastSaved: number;
   name?: string;
   saveDate?: string;
   species?: string;
-  rarity?: string;
   generation?: number;
   thumbnail?: string;
 }
@@ -49,7 +46,6 @@ interface StoredFish {
 type FishData = Record<string, unknown> & {
   id?: string;
   species?: string;
-  rarity?: string;
   generation?: number;
 };
 
@@ -73,9 +69,8 @@ export function saveFish(fishData: FishData, name: string = ''): SavedFish | nul
       saveDate: new Date(now).toISOString(),
       fishData: JSON.parse(JSON.stringify(fishData)), // Deep clone to avoid reference issues
       species: fishData.species || 'unknown',
-      rarity: fishData.rarity,
       generation: fishData.generation,
-      timestamp: now,
+      lastSaved: now,
     };
 
     // Add to fish collection
@@ -84,7 +79,7 @@ export function saveFish(fishData: FishData, name: string = ''): SavedFish | nul
       {
         ...savedFishItem,
         // Ensure we have all required fields for the storage format
-        timestamp: savedFishItem.timestamp || Date.now(),
+        lastSaved: savedFishItem.lastSaved || Date.now(),
       },
     ];
 
@@ -111,8 +106,8 @@ export function getSavedFish(): SavedFish[] {
     return collection.map(fish => {
       // Use the fishData directly since we don't need to modify it
       const fishData = fish.fishData;
-      const timestamp = fish.timestamp || Date.now();
-      const saveDate = fish.saveDate || new Date(timestamp).toISOString();
+      const lastSaved = fish.lastSaved || Date.now();
+      const saveDate = fish.saveDate || new Date(lastSaved).toISOString();
       const name = fish.name || `Fish ${fish.id.slice(0, 5)}`;
       const species = fish.species || fishData.species || 'unknown';
 
@@ -122,10 +117,9 @@ export function getSavedFish(): SavedFish[] {
         saveDate,
         fishData,
         species,
-        rarity: fish.rarity,
         generation: fish.generation,
         thumbnail: fish.thumbnail,
-        timestamp,
+        lastSaved,
       };
     });
   } catch (error) {

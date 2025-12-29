@@ -9,7 +9,7 @@ export interface FishCollectionItem {
   /** The fish data including position, state, etc. */
   fishData: FishData;
   /** When the fish was added to the collection */
-  timestamp: number;
+  lastSaved: number;
 }
 
 /**
@@ -73,6 +73,18 @@ export class GameStateManager {
       tankFish: [],
       fishInTank: [],
       fishInTankOriginalIds: [],
+      inventoryPresets: [
+        {
+          id: 'preset-all',
+          name: 'All',
+          isDefault: true,
+          filters: {},
+          columnOrder: [],
+          columnVisibility: {},
+          sort: null,
+        },
+      ],
+      selectedInventoryPresetId: 'preset-all',
     };
 
     this.state = defaultState;
@@ -268,7 +280,7 @@ export class GameStateManager {
           ? data.fish.map(fish => ({
               id: `fish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               fishData: fish,
-              timestamp: Date.now(),
+              lastSaved: Date.now(),
             }))
           : [],
     };

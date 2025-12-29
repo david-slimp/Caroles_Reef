@@ -14,9 +14,9 @@ interface FishData {
   originalId?: string;
   name?: string;
   species?: string;
+  lastSaved?: number;
   timestamp?: number;
   saveDate?: string;
-  rarity?: string;
   generation?: string;
   thumbnail?: string;
   fishData?: Record<string, unknown>;
@@ -180,6 +180,13 @@ class BackupManager {
         ...currentData,
         ...(backupCopy.gameState as Partial<GameSaveData>),
         fishCollection: backupCopy.fishCollection,
+        inventoryPresets: Array.isArray(backupCopy.inventoryPresets)
+          ? backupCopy.inventoryPresets
+          : currentData.inventoryPresets,
+        selectedInventoryPresetId:
+          typeof backupCopy.selectedInventoryPresetId === 'string'
+            ? backupCopy.selectedInventoryPresetId
+            : currentData.selectedInventoryPresetId,
         lastSaved: Date.now(),
       };
 

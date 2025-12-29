@@ -18,6 +18,7 @@ type UIRefs = {
   btnTheme: HTMLElement;
   btnDex: HTMLElement;
   btnCollection: HTMLElement;
+  btnNewCollection: HTMLElement;
   muteSfxBtn: HTMLElement;
   muteMusicBtn: HTMLElement;
   bubbleLevel: HTMLInputElement;
@@ -142,6 +143,24 @@ export function setupUIControls(ui: UIRefs, deps: Deps) {
     } catch (error) {
       console.error('Error showing fish collection:', error);
       toast('Failed to load fish collection', true);
+    }
+  });
+
+  // New collection modal button
+  ui.btnNewCollection?.addEventListener('click', async () => {
+    try {
+      const { newCollectionModal } = await import('../ui/NewCollectionModal');
+      newCollectionModal.show(async (fishData: any) => {
+        try {
+          await newCollectionModal.spawnFishFromData(fishData, fish);
+        } catch (error) {
+          console.error('Error adding fish to tank:', error);
+          toast('Failed to add fish to tank', true);
+        }
+      });
+    } catch (error) {
+      console.error('Error showing new collection modal:', error);
+      toast('Failed to load new collection', true);
     }
   });
 
