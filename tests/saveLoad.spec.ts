@@ -12,7 +12,7 @@ function makeFishCollection(count: number) {
     return {
       id,
       name: `Fish ${idx + 1}`,
-      timestamp: Date.now(),
+      lastSaved: Date.now(),
       fishData: {
         id,
         name: `Fish ${idx + 1}`,
@@ -61,7 +61,7 @@ describe('saveLoad', () => {
     const fishWithLegacySense = {
       id: 'fish-legacy-1',
       name: 'Legacy Sense',
-      timestamp: Date.now(),
+      lastSaved: Date.now(),
       fishData: {
         id: 'fish-legacy-1',
         name: 'Legacy Sense',
@@ -93,7 +93,7 @@ describe('saveLoad', () => {
     const legacyFish = {
       id: 'fish-legacy-appearance',
       name: 'Legacy Appearance',
-      timestamp: Date.now(),
+      lastSaved: Date.now(),
       fishData: {
         id: 'fish-legacy-appearance',
         name: 'Legacy Appearance',
@@ -150,7 +150,7 @@ describe('saveLoad', () => {
         {
           id: 'fish-export-1',
           name: 'Exportable',
-          timestamp: Date.now(),
+          lastSaved: Date.now(),
           fishData,
         },
       ],
@@ -202,7 +202,7 @@ describe('saveLoad', () => {
       fishCollection: [
         {
           id: 'fish-corrupt-1',
-          timestamp: Date.now(),
+          lastSaved: Date.now(),
           fishData: corruptedFish,
         },
       ],

@@ -7,7 +7,7 @@ describe('fishStorage', () => {
   it('saves fish data into game state and returns it on read', () => {
     gameState.updateState({ fishCollection: [] });
 
-    const saved = saveFish({ species: 'tester', rarity: 'rare', generation: 2 }, 'Specimen');
+    const saved = saveFish({ species: 'tester', generation: 2 }, 'Specimen');
     expect(saved).not.toBeNull();
 
     const all = getSavedFish();

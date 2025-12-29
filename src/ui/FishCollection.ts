@@ -970,12 +970,12 @@ class FishCollection {
       const fishEntry = {
         id: fishId,
         name: normalizedFish.name || fishData.name || 'NEW',
-        timestamp: Date.now(),
+        lastSaved: Date.now(),
         fishData: {
           ...normalizedFish,
           id: fishId, // Ensure ID is set
-          x: 0, // Reset position
-          y: 0,
+          x: normalizedFish.x,
+          y: normalizedFish.y,
           _mateId: null, // Reset mate ID
           _breedCd: 0, // Reset breed cooldown
           _ritualTimer: 0, // Reset ritual timer

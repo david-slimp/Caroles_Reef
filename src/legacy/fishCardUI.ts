@@ -183,6 +183,8 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
           eyeType: f.eyeType,
           size: f.size,
           maxSize: f.maxSize,
+          x: f.x,
+          y: f.y,
           age: f.age,
           sex: f.sex,
           speed: f.speed,

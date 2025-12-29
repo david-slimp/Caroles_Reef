@@ -2,54 +2,9 @@
 
 ## Cleanup / lint / formatting initiative (step-by-step)
 
-- DONE: Baseline status recorded (`git status -sb`).
-- DONE: Inventory lint/format issues: run `npm run lint` and capture active vs legacy file failures.
-- DONE: Decide scope: which legacy paths get excluded vs fixed (update ESLint ignores if needed).
-- DONE: Align lint-staged: ensure only active files get auto-fixed on commit.
-- DONE: Fix active-file lint errors, then re-run `npm run lint`.
 - TODO (duplication): Consolidate fish collection CRUD across `fishStorage`, `FishCollection`, and legacy FishCard paths.
 - TODO (duplication): Centralize validation so fish data is normalized in one place per flow (storage, backup, UI).
 - TODO (duplication): Remove direct `storageManager.save()` calls from UI fallbacks once GameState path is unified.
-- DONE: Update e2e fish collection tests to use `caroles_reef_save_data` key (retire `caroles_reef_saved_fish`).
-- DONE: Added tests for backup export normalization and corrupted restore defaults.
-- DONE: Adjusted topbar positioning/opacity and constrained fish movement below it.
-- DONE: Mate seeking only targets opposite sex and clears stale mate targets.
-- DONE: Load saved fish on startup; only seed 10 fish when no saved data exists.
-- DONE: Reload restores only fish that were in the live tank.
-- DONE: Fish movement bounds now refresh on window resize.
-- DONE: Collection table now shows fish sex.
-- DONE: Persist live tank snapshot (including non-collection fish) and flush on exit/reload.
-- DONE: Bumped app version to 0.1.5.
-- DONE: Added changelog formatter to enforce heading spacing rules.
-- DONE: Removed unused `old/` directory from the repo.
-- DONE: Removed legacy snapshot `src/legacy/runLegacyGame.ts.0829_2040`.
-- DONE: Fixed easy lint errors (removed `require()` usage, scoped switch case, removed unused import, replaced `@ts-ignore`).
-- DONE: `GameState` now uses static `storageManager` import to avoid mixed dynamic/static warning.
-- DONE: Moved Breeding HUD to top-right under the menu bar.
-- DONE: Breeding HUD now toggles from a FishCard button instead of opening automatically.
-- DONE: ESLint now ignores `src/legacy/**` during cleanup.
-- DONE: Added `docs/UNUSED_VARS_AUDIT.md` with unused-variable analysis.
-- DONE: Removed unused variables from `src/entities/fish.ts`.
-- DONE: `BackgroundConfig` now uses `unknown` for extra keys instead of `any`.
-- DONE: Tightened `FishManager` fish data typing and added a FishManager test.
-- DONE: Tightened fish storage typing and added a fishStorage test.
-- DONE: Creature type index signatures now use `unknown` instead of `any`.
-- DONE: GameState fishCollection typing tightened and added a GameState test.
-- DONE: Tightened spawn-to-tank bio data typing to avoid `any`.
-- DONE: Tightened localStorageManager fish data and serialization typing to avoid `any`.
-- DONE: Removed remaining explicit `any` usage across FishCollection, fish entity logic, BackupManager, validator, and tests.
-- DONE: Updated ActiveFiles overview + core/audio/legacy entries for current code paths.
-- DONE: Updated ActiveFiles entities/rendering/creatures/UI/config/utilities entries for current code paths.
-- DONE: Added missing active legacy/state files to ActiveFiles list.
-- DONE: Marked spawn-to-tank UI control as planned in ActiveFiles.
-- DONE: Added legacy methods/functions inventory (`docs/LegMethFunc.txt`).
-- DONE: Marked legacy methods/functions as used/internal in `docs/LegMethFunc.txt`.
-- DONE: Removed unused stubs `src/audio/bus.ts` and `src/creatures/registry.ts`.
-- DONE: Sweep dead files/unused code in active paths; remove or archive with notes.
-- DONE: Docs alignment: update or tag docs as legacy/plan/current to match code reality.
-- DONE: Documented planned `bioInventory` naming in planning docs.
-- DONE: Repo hygiene: ignore and remove tracked generated artifacts (`coverage/`).
-- DONE: Verify: run `npm test` and `npm run build`.
 - Record: update `CHANGELOG.md` and `TODO.md` with cleanup results.
 
 ## Storage / validation flow concerns (high priority)
@@ -118,7 +73,6 @@
 
 - Current branch: `chore/lint-format`.
 - Working tree should stay clean while we scope lint/cleanup work.
-- DONE: `coverage/` removed from git tracking and ignored going forward.
 
 ## Process Reminder
 

@@ -66,6 +66,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
   const btnTheme = document.getElementById('btnTheme') as HTMLElement;
   const btnDex = document.getElementById('btnDex') as HTMLElement;
   const btnCollection = document.getElementById('btnCollection') as HTMLElement;
+  const btnNewCollection = document.getElementById('btnNewCollection') as HTMLElement;
   const bubbleLevel = document.getElementById('bubbleLevel') as HTMLInputElement;
   const timeSpeed = document.getElementById('timeSpeed') as HTMLInputElement;
   const decorType = document.getElementById('decorType') as HTMLSelectElement;
@@ -278,6 +279,7 @@ export async function runLegacyGame(canvasId: string = 'c') {
     btnTheme,
     btnDex,
     btnCollection,
+    btnNewCollection,
     muteSfxBtn,
     muteMusicBtn,
     bubbleLevel,

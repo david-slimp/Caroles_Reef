@@ -10,7 +10,7 @@ describe('GameState', () => {
       fishCollection: [
         {
           id: 'fish-1',
-          timestamp: Date.now(),
+          lastSaved: Date.now(),
           fishData: { id: 'fish-1' },
         },
       ],

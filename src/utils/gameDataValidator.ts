@@ -1,6 +1,16 @@
-import type { GameSaveData } from './localStorageManager';
+import type { GameSaveData, InventoryPreset, InventoryFilterRule } from './localStorageManager';
 
 /** Default game state for new players */
+const DEFAULT_INVENTORY_PRESET: InventoryPreset = {
+  id: 'preset-all',
+  name: 'All',
+  isDefault: true,
+  filters: {},
+  columnOrder: [],
+  columnVisibility: {},
+  sort: null,
+};
+
 export const DEFAULT_SAVE_DATA: GameSaveData = {
   version: '1.0.0',
   lastSaved: Date.now(),
@@ -22,6 +32,8 @@ export const DEFAULT_SAVE_DATA: GameSaveData = {
   tankFish: [],
   fishInTank: [],
   fishInTankOriginalIds: [],
+  inventoryPresets: [DEFAULT_INVENTORY_PRESET],
+  selectedInventoryPresetId: 'preset-all',
   tank: {
     background: 'default',
     decorations: [],
@@ -115,6 +127,20 @@ export function validateAndTransformGameData<T = GameSaveData>(
     validated.fishInTankOriginalIds = [];
   }
 
+  // Inventory preset validation
+  if (!Array.isArray(validated.inventoryPresets)) {
+    validated.inventoryPresets = [DEFAULT_INVENTORY_PRESET];
+  } else {
+    validated.inventoryPresets = validateInventoryPresets(validated.inventoryPresets);
+  }
+
+  if (
+    typeof validated.selectedInventoryPresetId !== 'string' ||
+    !validated.inventoryPresets.some(preset => preset.id === validated.selectedInventoryPresetId)
+  ) {
+    validated.selectedInventoryPresetId = DEFAULT_INVENTORY_PRESET.id;
+  }
+
   // Transform and validate tank data
   if (!validated.tank || typeof validated.tank !== 'object') {
     validated.tank = { background: 'default', decorations: [] };
@@ -191,6 +217,7 @@ interface FishData {
 interface FishCollectionItem {
   id?: string;
   fishData?: FishData;
+  lastSaved?: number;
   timestamp?: number;
   name?: string;
   saveDate?: string;
@@ -312,6 +339,14 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
 
   // Gene validations
   const genes = validated.genes;
+
+  // Drop legacy rarity tag (only keep rarityGene)
+  if ('rarity' in validated) {
+    delete (validated as UnknownRecord).rarity;
+  }
+  if (genes && typeof genes === 'object' && 'rarity' in genes) {
+    delete (genes as UnknownRecord).rarity;
+  }
 
   // Migrate old senseRadius to senseGene if needed
   if (
@@ -476,9 +511,35 @@ function validateAndTransformFishCollectionItem(
   }
 
   const resolvedId = typeof input.id === 'string' && input.id ? input.id : validatedFish.id;
-  const resolvedTimestamp = typeof input.timestamp === 'number' ? input.timestamp : Date.now();
+  const resolvedLastSaved =
+    typeof input.lastSaved === 'number'
+      ? input.lastSaved
+      : typeof input.timestamp === 'number'
+        ? input.timestamp
+        : Date.now();
+  const resolvedSaveDate =
+    typeof input.saveDate === 'string' && input.saveDate
+      ? input.saveDate
+      : new Date(Date.now()).toISOString();
 
-  return {
+  // Reconcile birthTime using earliest available dates minus age.
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const lastSavedSeconds = Math.floor(resolvedLastSaved / 1000);
+  const saveDateMs = Date.parse(resolvedSaveDate);
+  const saveDateSeconds = Number.isNaN(saveDateMs) ? nowSeconds : Math.floor(saveDateMs / 1000);
+  const oldestSeconds = Math.min(nowSeconds, lastSavedSeconds, saveDateSeconds);
+  if (typeof validatedFish.age === 'number') {
+    const candidateBirth = Math.max(0, Math.floor(oldestSeconds - validatedFish.age * 60));
+    if (typeof validatedFish.birthTime !== 'number' || candidateBirth < validatedFish.birthTime) {
+      validatedFish.birthTime = candidateBirth;
+      validatedFish.age = Math.max(
+        0,
+        Math.round(((nowSeconds - validatedFish.birthTime) / 60) * 10) / 10
+      );
+    }
+  }
+
+  const result: FishCollectionItem = {
     ...input,
     id: resolvedId,
     name:
@@ -489,13 +550,16 @@ function validateAndTransformFishCollectionItem(
       typeof input.species === 'string' && input.species.trim()
         ? input.species
         : validatedFish.species || 'default',
-    saveDate:
-      typeof input.saveDate === 'string' && input.saveDate
-        ? input.saveDate
-        : new Date(resolvedTimestamp).toISOString(),
-    timestamp: resolvedTimestamp,
+    saveDate: resolvedSaveDate,
+    lastSaved: resolvedLastSaved,
     fishData: validatedFish,
   };
+
+  if ('timestamp' in result) {
+    delete (result as UnknownRecord).timestamp;
+  }
+
+  return result;
 }
 
 /**
@@ -651,6 +715,82 @@ function clampGene(value: unknown, min: number = 0, max: number = 9): number {
  */
 function clampSenseGene(value: unknown): number {
   return clampGene(value, 1, 9);
+}
+
+function validateInventoryPresets(presets: unknown[]): InventoryPreset[] {
+  const safePresets = presets
+    .map(preset => normalizeInventoryPreset(preset))
+    .filter((preset): preset is InventoryPreset => !!preset);
+
+  const hasDefault = safePresets.some(preset => preset.isDefault || preset.id === 'preset-all');
+  if (!hasDefault) {
+    safePresets.unshift(DEFAULT_INVENTORY_PRESET);
+  }
+
+  return safePresets;
+}
+
+function normalizeInventoryPreset(preset: unknown): InventoryPreset | null {
+  if (!preset || typeof preset !== 'object') {
+    return null;
+  }
+
+  const input = preset as Partial<InventoryPreset>;
+  const filters = normalizeInventoryFilters(input.filters);
+
+  return {
+    id: typeof input.id === 'string' && input.id ? input.id : `preset-${Date.now()}`,
+    name: typeof input.name === 'string' && input.name ? input.name : 'Preset',
+    isDefault: !!input.isDefault,
+    filters,
+    columnOrder: Array.isArray(input.columnOrder) ? input.columnOrder.filter(Boolean) : [],
+    columnVisibility:
+      input.columnVisibility && typeof input.columnVisibility === 'object'
+        ? { ...(input.columnVisibility as Record<string, boolean>) }
+        : {},
+    sort:
+      input.sort && typeof input.sort === 'object'
+        ? {
+            column: String((input.sort as { column?: string }).column || ''),
+            direction: (input.sort as { direction?: string }).direction === 'desc' ? 'desc' : 'asc',
+          }
+        : null,
+  };
+}
+
+function normalizeInventoryFilters(
+  filters: InventoryPreset['filters'] | undefined
+): Record<string, InventoryFilterRule> {
+  if (!filters || typeof filters !== 'object') {
+    return {};
+  }
+
+  const normalized: Record<string, InventoryFilterRule> = {};
+  for (const [key, value] of Object.entries(filters)) {
+    if (!value || typeof value !== 'object') {
+      continue;
+    }
+    const rule = value as InventoryFilterRule;
+    if (rule.type === 'set' || rule.type === 'number-set') {
+      normalized[key] = {
+        type: rule.type,
+        excluded: Array.isArray(rule.excluded) ? rule.excluded.map(String) : [],
+      };
+    } else if (rule.type === 'number-range') {
+      normalized[key] = {
+        type: 'number-range',
+        min: typeof rule.min === 'number' ? rule.min : null,
+        max: typeof rule.max === 'number' ? rule.max : null,
+      };
+    } else if (rule.type === 'text') {
+      normalized[key] = {
+        type: 'text',
+        query: typeof rule.query === 'string' ? rule.query : '',
+      };
+    }
+  }
+
+  return normalized;
 }
 
 export default {
