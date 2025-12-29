@@ -98,7 +98,9 @@ export interface GameSaveData {
       type: string;
       x: number;
       y: number;
-      rotation: number;
+      r?: number;
+      size?: 's' | 'm' | 'l';
+      rotation?: number;
     }>;
   };
 

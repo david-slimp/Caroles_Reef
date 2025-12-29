@@ -45,5 +45,3 @@ Track your collection in the in-game encyclopedia:
 ## ℹ️ About
 
 Carole's Reef is a relaxing aquarium simulation created with HTML5 and JavaScript. No installation required - just open in any modern web browser and enjoy!
-
-Version 0.1.0

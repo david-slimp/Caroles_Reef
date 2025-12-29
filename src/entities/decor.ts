@@ -33,6 +33,26 @@ export function placeDecor(x: number, y: number): Decor {
   return d;
 }
 
+export function pickDecor(x: number, y: number): Decor | null {
+  for (let i = env.decors.length - 1; i >= 0; i -= 1) {
+    const d = env.decors[i];
+    if (Math.hypot(d.x - x, d.y - y) <= d.r) {
+      return d;
+    }
+  }
+  return null;
+}
+
+export function removeDecor(target: Decor): boolean {
+  const idx = env.decors.findIndex(d => d.id === target.id);
+  if (idx === -1) {
+    return false;
+  }
+  const [removed] = env.decors.splice(idx, 1);
+  env.toast(`Removed ${removed.type}`);
+  return true;
+}
+
 export function nearDecorType(x: number, y: number, type: Decor['type'], rad?: number) {
   return env.decors.some(d => d.type === type && Math.hypot(d.x - x, d.y - y) <= (rad || d.r));
 }

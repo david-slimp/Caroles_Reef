@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.7] - 2025-12-29
+### Changed
+- Bumped app version to 0.1.7
+### Added
+- Fish now bounce/deflect off rocks with a brief slow-down and vertical nudge on collision
+- Added varied wander behaviors (loiter, slow, cruise, dart, top-bottom) for more natural fish movement
+- Added a selected-fish tooltip showing current state and wander mode
+### Fixed
+- Persisted placed decor in localStorage and backup/restore flows
+- Allowed decor items to be moved (drag) or removed (shift-click/right-click) after placement
+- Restored FishCard selection on click after drag handling changes
+
 ## [0.1.6] - 2025-12-28
 ### Added
 - Introduced a full-screen New Collection modal alongside the existing View Collection panel

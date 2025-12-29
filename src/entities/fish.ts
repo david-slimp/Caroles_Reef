@@ -38,6 +38,13 @@ type FishEntity = Record<string, unknown> & {
   x?: number;
   y?: number;
   _lastUpdateTime?: number;
+  _rockSlowTimer?: number;
+  _wanderMode?: string;
+  _wanderTimer?: number;
+  _wanderTargetX?: number;
+  _wanderTargetY?: number;
+  _wanderTopBottomY?: number;
+  _wanderSpeedMult?: number;
 };
 
 // Global state for fish module
@@ -45,6 +52,7 @@ let viewportSize: { W: number; H: number } = { W: 0, H: 0 };
 let getSizeFn: () => { W: number; H: number } = () => viewportSize;
 let pellets: unknown[] = [];
 let fish: FishEntity[] = [];
+let decors: Array<{ x: number; y: number; r: number; type?: string }> = [];
 let topInset = 10;
 
 /**
@@ -67,6 +75,7 @@ export function configureFish(config: {
   viewportSize = config.getSize();
   pellets = config.pellets;
   fish = config.fish;
+  decors = Array.isArray(config.decors) ? (config.decors as typeof decors) : [];
   if (typeof config.topInset === 'number') {
     topInset = config.topInset;
   }
@@ -642,6 +651,9 @@ export async function updateFish(f, dt) {
   if (f._eatCd > 0) {
     f._eatCd = Math.max(0, f._eatCd - dt);
   }
+  if (f._rockSlowTimer && f._rockSlowTimer > 0) {
+    f._rockSlowTimer = Math.max(0, f._rockSlowTimer - dt);
+  }
 
   // Store previous size to detect changes
   const prevSize = f.size;
@@ -958,10 +970,134 @@ export async function updateFish(f, dt) {
     }
   }
 
+  if (f.state !== 'wander') {
+    f._wanderTimer = 0;
+  }
+
+  if (!target && f.state === 'wander') {
+    const minY = Math.max(topInset, 10);
+    const maxY = H - 10;
+    const needsNewTarget =
+      !f._wanderTimer ||
+      f._wanderTimer <= 0 ||
+      typeof f._wanderTargetX !== 'number' ||
+      typeof f._wanderTargetY !== 'number';
+
+    if (needsNewTarget) {
+      const roll = Math.random();
+      let mode = 'cruise';
+      if (roll < 0.2) mode = 'loiter';
+      else if (roll < 0.45) mode = 'slow';
+      else if (roll < 0.8) mode = 'cruise';
+      else if (roll < 0.9) mode = 'topbottom';
+      else mode = 'dart';
+
+      let targetX = f.x;
+      let targetY = f.y;
+      let timer = 3;
+      let speedMult = 1;
+
+      if (mode === 'loiter') {
+        timer = rand(3, 6);
+        speedMult = rand(0.12, 0.25);
+        const decorCandidates = decors.filter(d => d.type === 'plant' || d.type === 'rock');
+        if (decorCandidates.length && Math.random() < 0.7) {
+          const d = decorCandidates[randi(0, decorCandidates.length)];
+          const angle = rand(0, Math.PI * 2);
+          const radius = d.r + rand(8, 25);
+          targetX = d.x + Math.cos(angle) * radius;
+          targetY = d.y + Math.sin(angle) * radius;
+        } else {
+          targetX = f.x + rand(-18, 18);
+          targetY = f.y + rand(-12, 12);
+        }
+      } else if (mode === 'slow') {
+        timer = rand(2, 6);
+        speedMult = rand(0.35, 0.7);
+        const decorCandidates = decors.filter(d => d.type === 'plant' || d.type === 'rock');
+        if (decorCandidates.length && Math.random() < 0.6) {
+          const d = decorCandidates[randi(0, decorCandidates.length)];
+          const angle = rand(0, Math.PI * 2);
+          const radius = d.r + rand(20, 60);
+          targetX = d.x + Math.cos(angle) * radius;
+          targetY = d.y + Math.sin(angle) * radius;
+        } else if (fish.length > 1 && Math.random() < 0.35) {
+          const other = fish[randi(0, fish.length)];
+          if (other && other !== f) {
+            targetX = (other.x || f.x) + rand(-50, 50);
+            targetY = (other.y || f.y) + rand(-30, 30);
+          }
+        } else {
+          targetX = f.x + rand(-60, 60);
+          targetY = f.y + rand(-40, 40);
+        }
+      } else if (mode === 'dart') {
+        timer = rand(0.8, 1.6);
+        speedMult = rand(1.4, 2.1);
+        targetX = rand(20, W - 20);
+        targetY = rand(minY + 10, maxY - 10);
+      } else if (mode === 'topbottom') {
+        timer = rand(12, 30);
+        speedMult = rand(0.55, 1.05);
+        f._wanderTopBottomY = Math.random() < 0.5 ? minY + rand(20, 80) : maxY - rand(20, 80);
+        targetX = rand(20, W - 20);
+        targetY = f._wanderTopBottomY;
+      } else {
+        timer = rand(3, 7);
+        speedMult = rand(0.7, 1.2);
+        targetX = rand(20, W - 20);
+        targetY = f.y + rand(-80, 80);
+      }
+
+      const minTargetDist =
+        mode === 'loiter'
+          ? 10
+          : mode === 'slow'
+            ? 20
+            : mode === 'topbottom'
+              ? 40
+              : mode === 'dart'
+                ? Math.min(120, W * 0.25)
+                : 35;
+      const dist = Math.hypot(targetX - f.x, targetY - f.y);
+      if (dist < minTargetDist) {
+        const angle = rand(0, Math.PI * 2);
+        targetX = f.x + Math.cos(angle) * minTargetDist;
+        targetY = f.y + Math.sin(angle) * (minTargetDist * 0.7);
+      }
+
+      f._wanderMode = mode;
+      f._wanderTimer = timer;
+      f._wanderSpeedMult = speedMult;
+      f._wanderTargetX = clamp(targetX, 10, W - 10);
+      f._wanderTargetY = clamp(targetY, minY, maxY);
+    } else {
+      f._wanderTimer -= dt;
+    }
+
+    const baseTargetX = f._wanderTargetX;
+    const baseTargetY =
+      f._wanderMode === 'topbottom' && typeof f._wanderTopBottomY === 'number'
+        ? f._wanderTopBottomY
+        : f._wanderTargetY;
+    let targetX = baseTargetX;
+    let targetY = baseTargetY;
+    if (f._wanderMode === 'topbottom') {
+      const swayX = Math.sin(f.age * 0.7) * 28;
+      const swayY = Math.sin(f.age * 0.4) * 10;
+      targetX = clamp((targetX || f.x) + swayX, 10, W - 10);
+      targetY = clamp((targetY || f.y) + swayY, minY, maxY);
+    }
+    target = { x: targetX, y: targetY };
+  }
+
   // decor influences
   let speedBoost = 1;
   if (nearDecorType(f.x, f.y, 'plant', 60)) speedBoost += 0.2;
   if (nearDecorType(f.x, f.y, 'rock', 60) && !isAdult(f)) speedBoost -= 0.2;
+  if (f._rockSlowTimer && f._rockSlowTimer > 0) {
+    speedBoost *= 0.6;
+  }
 
   // movement (state-aware + snappy turns near food)
   const stateMult =
@@ -975,7 +1111,9 @@ export async function updateFish(f, dt) {
             ? SPEED.MULTIPLIERS.flee
             : SPEED.MULTIPLIERS.wander;
 
-  let baseSpeed = (SPEED.BASE_OFFSET + f.speed * SPEED.GENE_SCALE) * stateMult;
+  const wanderSpeedMult =
+    f.state === 'wander' && typeof f._wanderSpeedMult === 'number' ? f._wanderSpeedMult : 1;
+  let baseSpeed = (SPEED.BASE_OFFSET + f.speed * SPEED.GENE_SCALE) * stateMult * wanderSpeedMult;
   let speedForClamp = baseSpeed;
 
   if (target) {
@@ -985,6 +1123,29 @@ export async function updateFish(f, dt) {
 
     if (d2 > EPS * EPS) {
       const dist = Math.sqrt(d2);
+      if (f.state === 'wander' && f._wanderMode) {
+        const arriveRadius =
+          f._wanderMode === 'loiter'
+            ? 12
+            : f._wanderMode === 'slow'
+              ? 18
+              : f._wanderMode === 'dart'
+                ? 45
+                : f._wanderMode === 'topbottom'
+                  ? 55
+                  : 28;
+        if (dist < arriveRadius) {
+          if (f._wanderMode === 'topbottom') {
+            f._wanderTargetX = rand(20, W - 20);
+            f.vx *= 0.8;
+            f.vy *= 0.8;
+          } else {
+            f._wanderTimer = 0;
+            f.vx *= 0.7;
+            f.vy *= 0.7;
+          }
+        }
+      }
       const ux = dx / dist;
       const uy = dy / dist;
 
@@ -1059,6 +1220,36 @@ export async function updateFish(f, dt) {
   f.vy *= dampingY;
   f.x += f.vx * dt;
   f.y += f.vy * dt;
+
+  // rock collisions: bounce or deflect, add vertical nudge, and short slow-down
+  for (let i = 0; i < decors.length; i += 1) {
+    const d = decors[i];
+    if (!d || d.type !== 'rock') continue;
+    const dx = (f.x || 0) - d.x;
+    const dy = (f.y || 0) - d.y;
+    const dist = Math.hypot(dx, dy);
+    const fishRadius = Math.max(8, (f.size || 10) * 0.6);
+    const minDist = d.r + fishRadius;
+    if (dist < minDist) {
+      const nx = dist > 0 ? dx / dist : Math.cos(Math.random() * Math.PI * 2);
+      const ny = dist > 0 ? dy / dist : Math.sin(Math.random() * Math.PI * 2);
+      const speed = Math.max(10, Math.hypot(f.vx || 0, f.vy || 0));
+      const bounce = Math.random() < 0.75;
+      f.x = d.x + nx * minDist;
+      f.y = d.y + ny * minDist;
+      if (bounce) {
+        const dot = (f.vx || 0) * nx + (f.vy || 0) * ny;
+        f.vx = (f.vx || 0) - 2 * dot * nx;
+        f.vy = (f.vy || 0) - 2 * dot * ny;
+      } else {
+        f.vx = (f.vx || 0) * 0.8;
+        f.vy = (f.vy || 0) * 0.8;
+      }
+      f.vy += (Math.random() < 0.5 ? -1 : 1) * speed * 0.2;
+      f._rockSlowTimer = 1;
+      break;
+    }
+  }
 
   // bounds
   if (f.x < 10) {
@@ -1419,6 +1610,30 @@ export function drawFish(f: FishEntity, ctx: CanvasRenderingContext2D) {
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
+
+    const baseState = typeof f.state === 'string' ? f.state : 'wander';
+    const wanderMode =
+      baseState === 'wander' && typeof f._wanderMode === 'string' ? f._wanderMode : '';
+    const label = wanderMode ? `State: ${baseState} (${wanderMode})` : `State: ${baseState}`;
+    const paddingX = 6;
+    const paddingY = 3;
+    const fontSize = 12;
+    const labelY = f.y - (Math.max(16, f.size) + 14);
+    ctx.font = `${fontSize}px "Trebuchet MS", Verdana, sans-serif`;
+    const metrics = ctx.measureText(label);
+    const boxW = metrics.width + paddingX * 2;
+    const boxH = fontSize + paddingY * 2;
+    const boxX = f.x - boxW / 2;
+    const boxY = labelY - boxH;
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(8, 12, 18, 0.8)';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#cfe9ff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, f.x, boxY + boxH / 2);
+
     ctx.restore();
   }
 

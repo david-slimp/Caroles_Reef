@@ -5,7 +5,14 @@
  */
 
 import { fishManager } from '../creatures/FishManager';
-import { configureDecor, decorSelect, placeDecor } from '../entities/decor';
+import {
+  configureDecor,
+  decorRadius,
+  decorSelect,
+  placeDecor,
+  pickDecor,
+  removeDecor,
+} from '../entities/decor';
 import {
   configureFish,
   makeFish,
@@ -102,6 +109,43 @@ export async function runLegacyGame(canvasId: string = 'c') {
     let i = 0;
     return () => (++i).toString(36) + '-' + Date.now().toString(36);
   })();
+  const randomId = () => `decor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const applyDecorFromState = () => {
+    const savedDecor = gameState.getState().tank?.decorations;
+    decors.length = 0;
+    if (!Array.isArray(savedDecor)) {
+      return;
+    }
+    savedDecor.forEach(d => {
+      const size = d.size === 's' || d.size === 'm' || d.size === 'l' ? d.size : 'm';
+      decors.push({
+        id: d.id || randomId(),
+        type: d.type || 'plant',
+        x: typeof d.x === 'number' ? d.x : 0,
+        y: typeof d.y === 'number' ? d.y : 0,
+        size,
+        r: typeof d.r === 'number' ? d.r : decorRadius(size),
+      });
+    });
+  };
+
+  const syncDecorToState = () => {
+    const currentState = gameState.getState();
+    gameState.updateState({
+      tank: {
+        ...currentState.tank,
+        decorations: decors.map(d => ({
+          id: d.id,
+          type: d.type,
+          x: d.x,
+          y: d.y,
+          r: d.r,
+          size: d.size,
+        })),
+      },
+    });
+  };
 
   // === Game State (same semantics) ===
   const fish: any[] = [];
@@ -143,6 +187,8 @@ export async function runLegacyGame(canvasId: string = 'c') {
   const bubbles = createBubbles(() => ({ W, H }), ctx);
 
   // === Configure systems that rely on legacy globals ===
+  applyDecorFromState();
+
   configureFish({
     getSize: () => ({ W, H }),
     ctx,
@@ -171,6 +217,10 @@ export async function runLegacyGame(canvasId: string = 'c') {
     getSize: () => ({ W, H }),
     decors,
     rand,
+  });
+
+  window.addEventListener('backupRestored', () => {
+    applyDecorFromState();
   });
 
   gameState.setTankSnapshotProvider(() => fish.map(f => JSON.parse(JSON.stringify(f))));
@@ -312,11 +362,14 @@ export async function runLegacyGame(canvasId: string = 'c') {
     clamp,
     topInset,
     pickFish,
+    pickDecor,
+    removeDecor,
     placeDecor,
     showFishCard: fishCardUI.showFishCard,
     addPellet: (x: number, y: number) => addPellet(pellets, x, y, rand, uuid),
     modeRef,
     panelDecorEl: panelDecor,
+    onDecorChanged: syncDecorToState,
   });
 
   // === Dex UI ===

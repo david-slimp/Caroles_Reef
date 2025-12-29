@@ -178,7 +178,7 @@ class BackupManager {
       // Update the in-memory data with backup data
       const updatedData: GameSaveData = {
         ...currentData,
-        ...(backupCopy.gameState as Partial<GameSaveData>),
+        ...(backupCopy as Partial<GameSaveData>),
         fishCollection: backupCopy.fishCollection,
         inventoryPresets: Array.isArray(backupCopy.inventoryPresets)
           ? backupCopy.inventoryPresets

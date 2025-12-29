@@ -11,6 +11,14 @@ const DEFAULT_INVENTORY_PRESET: InventoryPreset = {
   sort: null,
 };
 
+const DECOR_RADIUS_BY_SIZE = {
+  s: 30,
+  m: 50,
+  l: 80,
+} as const;
+const DECOR_TYPES = new Set(['plant', 'coral', 'rock', 'chest']);
+const DECOR_SIZES = new Set(['s', 'm', 'l']);
+
 export const DEFAULT_SAVE_DATA: GameSaveData = {
   version: '1.0.0',
   lastSaved: Date.now(),
@@ -148,6 +156,10 @@ export function validateAndTransformGameData<T = GameSaveData>(
 
   if (!Array.isArray(validated.tank.decorations)) {
     validated.tank.decorations = [];
+  } else {
+    validated.tank.decorations = validated.tank.decorations
+      .map(decor => normalizeDecorItem(decor))
+      .filter(Boolean);
   }
 
   // Transform and validate progress
@@ -167,6 +179,28 @@ export function validateAndTransformGameData<T = GameSaveData>(
   validated.lastSaved = timestamp;
 
   return validated as unknown as T;
+}
+
+function normalizeDecorItem(decor: unknown) {
+  if (!decor || typeof decor !== 'object') {
+    return null;
+  }
+  const item = decor as UnknownRecord;
+  const size = typeof item.size === 'string' && DECOR_SIZES.has(item.size) ? item.size : 'm';
+  const type = typeof item.type === 'string' && DECOR_TYPES.has(item.type) ? item.type : 'plant';
+  const r =
+    typeof item.r === 'number' && Number.isFinite(item.r) ? item.r : DECOR_RADIUS_BY_SIZE[size];
+  return {
+    id:
+      typeof item.id === 'string' && item.id
+        ? item.id
+        : `decor-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type,
+    x: typeof item.x === 'number' && Number.isFinite(item.x) ? item.x : 0,
+    y: typeof item.y === 'number' && Number.isFinite(item.y) ? item.y : 0,
+    r,
+    size,
+  };
 }
 
 /**
