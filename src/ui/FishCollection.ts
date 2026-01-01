@@ -236,6 +236,15 @@ class FishCollection {
           valueB = Number(b.fishData.senseGene || 0);
           isNumeric = true;
           break;
+        case 'defAffGene':
+          valueA = Number(a.fishData.defAffGene || 0);
+          valueB = Number(b.fishData.defAffGene || 0);
+          isNumeric = true;
+          break;
+        case 'defAffType':
+          valueA = a.fishData.defAffType?.toLowerCase() || '';
+          valueB = b.fishData.defAffType?.toLowerCase() || '';
+          break;
         case 'hue':
           // Handle hue values (0-360)
           valueA = Number(a.fishData.colorHue || 0);
@@ -275,6 +284,10 @@ class FishCollection {
         console.log(
           `Comparing sense: ${a.fishData.senseGene} vs ${b.fishData.senseGene} = ${result}`
         );
+      } else if (this.sortColumn === 'defAffGene') {
+        console.log(
+          `Comparing def aff: ${a.fishData.defAffGene} vs ${b.fishData.defAffGene} = ${result}`
+        );
       } else if (this.sortColumn === 'hue') {
         console.log(`Comparing hue: ${a.fishData.colorHue} vs ${b.fishData.colorHue} = ${result}`);
       }
@@ -300,6 +313,15 @@ class FishCollection {
           name: fish.name,
           senseGene: fish.fishData.senseGene,
           senseType: typeof fish.fishData.senseGene,
+        }))
+      );
+    } else if (this.sortColumn === 'defAffGene') {
+      console.log(
+        'Sorted def aff values:',
+        sorted.map(fish => ({
+          name: fish.name,
+          defAffGene: fish.fishData.defAffGene,
+          defAffType: fish.fishData.defAffType,
         }))
       );
     }
@@ -378,12 +400,18 @@ class FishCollection {
       return;
     }
 
-    console.log('Rendering fish collection...');
+    if (DEBUG_FISH_COLLECTION) {
+      console.log('Rendering fish collection...');
+    }
     const savedFish = this.getSavedFish();
-    console.log(`Total fish to render: ${savedFish.length}`);
+    if (DEBUG_FISH_COLLECTION) {
+      console.log(`Total fish to render: ${savedFish.length}`);
+    }
 
     const sortedFish = this.sortFishCollection(savedFish);
-    console.log(`Sorted ${sortedFish.length} fish for display`);
+    if (DEBUG_FISH_COLLECTION) {
+      console.log(`Sorted ${sortedFish.length} fish for display`);
+    }
 
     this.panel.innerHTML = `
       <style>
@@ -568,6 +596,12 @@ class FishCollection {
               <th style="width: 60px;" class="sortable" data-column="sense">
                 Sense ${this.sortColumn === 'sense' ? (this.sortDirection === 'asc' ? '↑' : '↓') : ''}
               </th>
+              <th style="width: 70px;" class="sortable" data-column="defAffGene">
+                Def Aff ${this.sortColumn === 'defAffGene' ? (this.sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </th>
+              <th style="width: 80px;" class="sortable" data-column="defAffType">
+                Def Type ${this.sortColumn === 'defAffType' ? (this.sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </th>
               <th style="width: 50px;" class="sortable" data-column="hue">
                 Hue ${this.sortColumn === 'hue' ? (this.sortDirection === 'asc' ? '↑' : '↓') : ''}
               </th>
@@ -585,7 +619,7 @@ class FishCollection {
             ${
               sortedFish.length > 0
                 ? sortedFish.map(fish => this.createFishCard(fish)).join('')
-                : `<tr><td colspan="12" class="no-fish">No fish in your collection yet. Select a fish and click "Save to Collection".</td></tr>`
+                : `<tr><td colspan="15" class="no-fish">No fish in your collection yet. Select a fish and click "Save to Collection".</td></tr>`
             }
           </tbody>
         </table>
@@ -692,6 +726,8 @@ class FishCollection {
         <td class="fish-sex">${fishData.sex || '—'}</td>
         <td class="fish-speed">${formatStat(fishData.speed)}</td>
         <td class="fish-sense">${formatStat(fishData.senseGene)}</td>
+        <td class="fish-def-aff">${formatStat(fishData.defAffGene)}</td>
+        <td class="fish-def-type">${fishData.defAffType || '—'}</td>
         <td class="fish-hue">${fishData.colorHue || 0}°</td>
         <td class="fish-color">${colorSwatch}</td>
         <td class="fish-fins">${fishData.finShape ? getTailShapeDisplayName(fishData.finShape as TailShape) : '—'}</td>
@@ -708,22 +744,30 @@ class FishCollection {
    */
   public getSavedFish(): SavedFish[] {
     try {
-      console.log('Getting saved fish from game state...');
+      if (DEBUG_FISH_COLLECTION) {
+        console.log('Getting saved fish from game state...');
+      }
       const gameState = this.getGameState();
 
       if (!gameState) {
-        console.log('No gameState available, using storage manager cache');
+        if (DEBUG_FISH_COLLECTION) {
+          console.log('No gameState available, using storage manager cache');
+        }
         const currentData = storageManager.getCurrentData();
         return Array.isArray(currentData.fishCollection) ? currentData.fishCollection : [];
       }
 
       const state = gameState.getState();
-      console.log('Current game state:', state);
+      if (DEBUG_FISH_COLLECTION) {
+        console.log('Current game state:', state);
+      }
 
       // Check for fish collection in the root of the state
       if (state?.fishCollection) {
         const fish = Array.isArray(state.fishCollection) ? state.fishCollection : [];
-        console.log(`Retrieved ${fish.length} fish from gameState.fishCollection`);
+        if (DEBUG_FISH_COLLECTION) {
+          console.log(`Retrieved ${fish.length} fish from gameState.fishCollection`);
+        }
         return fish;
       }
 
@@ -732,11 +776,15 @@ class FishCollection {
         const fish = Array.isArray(state.gameState.fishCollection)
           ? state.gameState.fishCollection
           : [];
-        console.log(`Retrieved ${fish.length} fish from gameState.gameState.fishCollection`);
+        if (DEBUG_FISH_COLLECTION) {
+          console.log(`Retrieved ${fish.length} fish from gameState.gameState.fishCollection`);
+        }
         return fish;
       }
 
-      console.log('No fish collection found in gameState');
+      if (DEBUG_FISH_COLLECTION) {
+        console.log('No fish collection found in gameState');
+      }
       return [];
     } catch (error) {
       console.error('Error in getSavedFish:', error);
@@ -1181,6 +1229,8 @@ class FishCollection {
     }
   }
 }
+
+const DEBUG_FISH_COLLECTION = false;
 
 // Create and export a singleton instance
 const fishCollection = new FishCollection();

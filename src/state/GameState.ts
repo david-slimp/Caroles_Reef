@@ -33,6 +33,7 @@ type FishData = Record<string, unknown> & { id?: string };
  * Manages the game state and notifies subscribers of changes
  */
 export class GameStateManager {
+  private static readonly DEBUG = false;
   private static instance: GameStateManager;
   private state: GameState;
   private subscribers: Array<(state: GameState) => void> = [];
@@ -60,6 +61,8 @@ export class GameStateManager {
         musicTrack: 'default',
         theme: 'light',
         uiScale: 1.0,
+        paused: false,
+        debugDecorRadius: false,
       },
       tank: {
         background: 'default',
@@ -89,7 +92,9 @@ export class GameStateManager {
 
     this.state = defaultState;
 
-    console.log('[GameState] Initialized with default state:', this.state);
+    if (GameStateManager.DEBUG) {
+      console.log('[GameState] Initialized with default state:', this.state);
+    }
   }
 
   /**
@@ -116,7 +121,9 @@ export class GameStateManager {
   public updateState(
     updater: ((state: GameState) => Partial<GameState>) | Partial<GameState>
   ): void {
-    console.groupCollapsed('[GameState] Updating state');
+    if (GameStateManager.DEBUG) {
+      console.groupCollapsed('[GameState] Updating state');
+    }
 
     try {
       const prevState = { ...this.state };
@@ -142,12 +149,14 @@ export class GameStateManager {
       }
 
       // Log the changes before updating the state
-      console.log('State changes:', {
-        prevFishCount: prevState.fishCollection?.length || 0,
-        nextFishCount: nextState.fishCollection?.length || 0,
-        prevFishIds: prevState.fishCollection?.map(f => f.id) || [],
-        nextFishIds: nextState.fishCollection?.map(f => f.id) || [],
-      });
+      if (GameStateManager.DEBUG) {
+        console.log('State changes:', {
+          prevFishCount: prevState.fishCollection?.length || 0,
+          nextFishCount: nextState.fishCollection?.length || 0,
+          prevFishIds: prevState.fishCollection?.map(f => f.id) || [],
+          nextFishIds: nextState.fishCollection?.map(f => f.id) || [],
+        });
+      }
 
       // Update the state reference
       this.state = nextState;
@@ -156,12 +165,16 @@ export class GameStateManager {
       // Notify subscribers
       this.notifySubscribers();
 
-      console.log('[GameState] State updated and subscribers notified');
+      if (GameStateManager.DEBUG) {
+        console.log('[GameState] State updated and subscribers notified');
+      }
     } catch (error) {
       console.error('[GameState] Error updating state:', error);
       throw error;
     } finally {
-      console.groupEnd();
+      if (GameStateManager.DEBUG) {
+        console.groupEnd();
+      }
     }
   }
 
@@ -170,6 +183,14 @@ export class GameStateManager {
    */
   public setTankSnapshotProvider(provider: (() => FishData[]) | null): void {
     this.tankSnapshotProvider = provider;
+  }
+
+  /**
+   * Returns a snapshot of the live tank fish when available.
+   */
+  public getTankSnapshot(): FishData[] {
+    const snapshot = this.tankSnapshotProvider ? this.tankSnapshotProvider() : this.state.tankFish;
+    return Array.isArray(snapshot) ? snapshot : [];
   }
 
   /**
@@ -187,17 +208,23 @@ export class GameStateManager {
 
   private notifySubscribers() {
     if (this.subscribers.length > 0) {
-      console.log(`[GameState] Notifying ${this.subscribers.length} subscribers`);
+      if (GameStateManager.DEBUG) {
+        console.log(`[GameState] Notifying ${this.subscribers.length} subscribers`);
+      }
       this.subscribers.forEach((callback, index) => {
         try {
-          console.log(`[GameState] Notifying subscriber #${index + 1}`);
+          if (GameStateManager.DEBUG) {
+            console.log(`[GameState] Notifying subscriber #${index + 1}`);
+          }
           callback({ ...this.state });
         } catch (error) {
           console.error(`[GameState] Error in subscriber #${index + 1}:`, error);
         }
       });
     } else {
-      console.warn('[GameState] No subscribers to notify');
+      if (GameStateManager.DEBUG) {
+        console.warn('[GameState] No subscribers to notify');
+      }
     }
   }
 

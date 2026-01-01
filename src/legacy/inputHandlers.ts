@@ -11,6 +11,7 @@ export function attachInputHandlers(opts: {
   pickFish: (x: number, y: number) => any | null;
   pickDecor: (x: number, y: number) => any | null;
   removeDecor: (d: any) => boolean;
+  bringDecorToFront?: (d: any) => boolean;
   placeDecor: (x: number, y: number) => void;
   showFishCard: (f: any) => void;
   addPellet: (x: number, y: number) => void;
@@ -26,6 +27,7 @@ export function attachInputHandlers(opts: {
     pickFish,
     pickDecor,
     removeDecor,
+    bringDecorToFront,
     placeDecor,
     showFishCard,
     addPellet,
@@ -80,6 +82,12 @@ export function attachInputHandlers(opts: {
     if (panelDecorEl.style.display === 'block') {
       const d = pickDecor(mouse.x, mouse.y);
       if (d) {
+        if (bringDecorToFront) {
+          bringDecorToFront(d);
+          if (onDecorChanged) {
+            onDecorChanged();
+          }
+        }
         draggingDecor = d;
         dragDecorOffset.x = mouse.x - d.x;
         dragDecorOffset.y = mouse.y - d.y;

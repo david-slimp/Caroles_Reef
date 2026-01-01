@@ -107,6 +107,7 @@ The application is moving toward a centralized persistence model where:
 - src/ui/BackupManagerUI.ts - Backup/restore UI
   * REQUIRES: src/utils/BackupManager.ts, ./toast.ts
   * USED-BY: src/legacy/runLegacyGame.ts
+  * NOTES: Restore dialog includes options to keep tank fish, restore tank fish, and restore tank layout
 - src/ui/toast.ts - Toast notification system
   * REQUIRES: (none)
   * USED-BY: src/ui/FishCollection.ts, src/ui/FishCard.ts, src/ui/BackupManagerUI.ts, src/ui/controls/spawnToTank.ts, src/entities/fish.ts, src/legacy/uiControls.ts
@@ -121,6 +122,7 @@ The application is moving toward a centralized persistence model where:
 - src/render/decorRenderer.ts - Decoration rendering
   * REQUIRES: src/state/types.ts
   * USED-BY: src/legacy/runLegacyGame.ts
+  * NOTES: Debug decor radius overlay toggled by settings.debugDecorRadius
 
 ## Configuration
 - src/config/gameConfig.ts - Game title/version/config values

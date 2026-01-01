@@ -19,7 +19,9 @@
 ## Backup / restore flow concerns
 
 - `BackupManager` builds backup from `gameState` plus `FishManager` bio inventory; verify the expected shape and versioning.
-- Restore merges `backup.gameState` into top-level save data (shape mismatch risk); verify intended structure.
+- DONE: Restore merges full backup into top-level save data (no nested `backup.gameState`).
+- DONE: Restore UI now includes options for keeping tank fish and restoring tank layout.
+- DONE: Restore seeds 10 fish when tank fish are not restored.
 - Restore updates globals (`window.fishCollection`, `window.fish`) and repopulates `FishManager` (extra side effects).
 - DONE: GameState is the runtime source of truth; FishManager/globals are legacy adapters only.
 - Clarify separation between regular localStorage saves vs manual file-based backup/restore (two distinct persistence paths).
@@ -71,7 +73,7 @@
 
 ## Branch / repo status snapshot
 
-- Current branch: `chore/lint-format`.
+- Current branch: `bugfix/5-decor-move-remove`.
 - Working tree should stay clean while we scope lint/cleanup work.
 
 ## Process Reminder

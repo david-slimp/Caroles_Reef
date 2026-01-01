@@ -20,6 +20,8 @@ Personalize your aquarium with various decorations:
 - **Rocks**: Provide hiding spots for shy fish
 - **Treasure**: Purely cosmetic additions to beautify your tank
 
+Debug tip: The Decor panel includes a Debug checkbox to show decor interaction radii.
+
 ### Themes
 
 Change the look and feel of your aquarium:
@@ -41,6 +43,10 @@ Track your collection in the in-game encyclopedia:
 - Place coral near potential breeding pairs to increase chances of rare traits
 - Different decorations affect fish behavior - experiment to see how they interact
 - Watch for special shiny fish - they're extra rare!
+
+## 🧬 Gene Notes
+
+- `defAff` = Decor Affinity (preference/repulsion toward decor types)
 
 ## ℹ️ About
 

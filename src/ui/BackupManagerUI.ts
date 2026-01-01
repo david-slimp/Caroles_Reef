@@ -257,20 +257,25 @@ export class BackupManagerUI {
 
     try {
       console.log('Showing restore confirmation dialog');
-      const preserveTankFish = await this.showRestoreConfirmation();
-      console.log('User selected preserveTankFish:', preserveTankFish);
+      const restoreOptions = await this.showRestoreConfirmation();
+      console.log('User selected restore options:', restoreOptions);
 
-      if (preserveTankFish === null) {
+      if (!restoreOptions) {
         console.log('User cancelled restore operation');
         return; // User cancelled
       }
 
       console.log('Starting backup restore...');
-      const success = await backupManager.handleFileUpload({ file, preserveTankFish });
+      const success = await backupManager.handleFileUpload({
+        file,
+        preserveTankFish: restoreOptions.preserveTankFish,
+        restoreTankFish: restoreOptions.restoreTankFish,
+        restoreTankLayout: restoreOptions.restoreTankLayout,
+      });
       console.log('Backup restore completed with status:', success);
 
       if (success) {
-        const message = preserveTankFish
+        const message = restoreOptions.preserveTankFish
           ? 'Game data restored successfully! Your current fish are still in the tank.'
           : 'Game data restored successfully!';
         console.log(message);
@@ -280,7 +285,7 @@ export class BackupManagerUI {
         const event = new CustomEvent('backupRestoredUI', {
           detail: {
             timestamp: new Date().toISOString(),
-            preserveTankFish,
+            ...restoreOptions,
           },
         });
         window.dispatchEvent(event);
@@ -304,7 +309,11 @@ export class BackupManagerUI {
    * Shows a confirmation dialog for restore with option to preserve tank fish
    * @returns {Promise<boolean | null>} True to preserve tank fish, false to not, null if cancelled
    */
-  private showRestoreConfirmation(): Promise<boolean | null> {
+  private showRestoreConfirmation(): Promise<{
+    preserveTankFish: boolean;
+    restoreTankFish: boolean;
+    restoreTankLayout: boolean;
+  } | null> {
     console.log('showRestoreConfirmation called');
     return new Promise(resolve => {
       try {
@@ -349,6 +358,18 @@ export class BackupManagerUI {
               Keep fish currently in the tank
             </label>
           </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" id="restoreTankFish" checked style="margin-right: 10px;">
+              Restore bio from save file to tank
+            </label>
+          </div>
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" id="restoreTankLayout" checked style="margin-right: 10px;">
+              Restore tank layout from save file
+            </label>
+          </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
             <button id="cancelRestore" style="padding: 8px 16px; background: #4a5568; color: white; border: none; border-radius: 4px; cursor: pointer;">
               Cancel
@@ -370,13 +391,27 @@ export class BackupManagerUI {
         const confirmBtn = dialog.querySelector('#confirmRestore') as HTMLButtonElement;
         const cancelBtn = dialog.querySelector('#cancelRestore') as HTMLButtonElement;
         const preserveCheckbox = dialog.querySelector('#preserveTankFish') as HTMLInputElement;
+        const restoreTankFishCheckbox = dialog.querySelector(
+          '#restoreTankFish'
+        ) as HTMLInputElement;
+        const restoreTankLayoutCheckbox = dialog.querySelector(
+          '#restoreTankLayout'
+        ) as HTMLInputElement;
 
         // Log if elements were found
         console.log('Confirm button found:', !!confirmBtn);
         console.log('Cancel button found:', !!cancelBtn);
         console.log('Preserve checkbox found:', !!preserveCheckbox);
+        console.log('Restore tank fish checkbox found:', !!restoreTankFishCheckbox);
+        console.log('Restore tank layout checkbox found:', !!restoreTankLayoutCheckbox);
 
-        if (!confirmBtn || !cancelBtn || !preserveCheckbox) {
+        if (
+          !confirmBtn ||
+          !cancelBtn ||
+          !preserveCheckbox ||
+          !restoreTankFishCheckbox ||
+          !restoreTankLayoutCheckbox
+        ) {
           console.error('One or more required elements not found in dialog');
           console.log('Dialog HTML for debugging:', dialog.innerHTML);
           if (overlay.parentNode) {
@@ -403,9 +438,17 @@ export class BackupManagerUI {
 
         // Set up event handlers
         const handleConfirm = () => {
-          console.log('User confirmed restore with preserveTankFish:', preserveCheckbox.checked);
+          console.log('User confirmed restore options:', {
+            preserveTankFish: preserveCheckbox.checked,
+            restoreTankFish: restoreTankFishCheckbox.checked,
+            restoreTankLayout: restoreTankLayoutCheckbox.checked,
+          });
           cleanup();
-          resolve(preserveCheckbox.checked);
+          resolve({
+            preserveTankFish: preserveCheckbox.checked,
+            restoreTankFish: restoreTankFishCheckbox.checked,
+            restoreTankLayout: restoreTankLayoutCheckbox.checked,
+          });
         };
 
         const handleCancel = () => {
@@ -423,9 +466,14 @@ export class BackupManagerUI {
           } else if (e.key === 'Enter' && document.activeElement === cancelBtn) {
             handleCancel();
           } else if (e.key === ' ' || e.key === 'Spacebar') {
-            if (document.activeElement === preserveCheckbox) {
+            if (
+              document.activeElement === preserveCheckbox ||
+              document.activeElement === restoreTankFishCheckbox ||
+              document.activeElement === restoreTankLayoutCheckbox
+            ) {
               e.preventDefault();
-              preserveCheckbox.checked = !preserveCheckbox.checked;
+              const active = document.activeElement as HTMLInputElement;
+              active.checked = !active.checked;
             }
           }
         };

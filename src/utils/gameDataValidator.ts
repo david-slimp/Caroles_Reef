@@ -12,12 +12,17 @@ const DEFAULT_INVENTORY_PRESET: InventoryPreset = {
 };
 
 const DECOR_RADIUS_BY_SIZE = {
-  s: 30,
-  m: 50,
-  l: 80,
+  s: 20,
+  m: 25,
+  l: 40,
 } as const;
 const DECOR_TYPES = new Set(['plant', 'coral', 'rock', 'chest']);
 const DECOR_SIZES = new Set(['s', 'm', 'l']);
+const ROCK_RADIUS_BY_SIZE = {
+  s: 18,
+  m: 30,
+  l: 48,
+} as const;
 
 export const DEFAULT_SAVE_DATA: GameSaveData = {
   version: '1.0.0',
@@ -34,6 +39,8 @@ export const DEFAULT_SAVE_DATA: GameSaveData = {
     musicTrack: 'default',
     theme: 'day',
     uiScale: 1.0,
+    paused: false,
+    debugDecorRadius: false,
   },
   fish: [],
   fishCollection: [],
@@ -99,6 +106,22 @@ export function validateAndTransformGameData<T = GameSaveData>(
   if (typeof validated.gameState.score !== 'number' || validated.gameState.score < 0) {
     validated.gameState.score = 0;
   }
+
+  if (!validated.settings || typeof validated.settings !== 'object') {
+    validated.settings = {};
+  }
+  validated.settings.volume =
+    typeof validated.settings.volume === 'number' ? validated.settings.volume : 0.7;
+  validated.settings.sfxMuted = !!validated.settings.sfxMuted;
+  validated.settings.musicMuted = !!validated.settings.musicMuted;
+  validated.settings.musicTrack =
+    typeof validated.settings.musicTrack === 'string' ? validated.settings.musicTrack : 'default';
+  validated.settings.theme =
+    typeof validated.settings.theme === 'string' ? validated.settings.theme : 'day';
+  validated.settings.uiScale =
+    typeof validated.settings.uiScale === 'number' ? validated.settings.uiScale : 1.0;
+  validated.settings.paused = !!validated.settings.paused;
+  validated.settings.debugDecorRadius = !!validated.settings.debugDecorRadius;
 
   // Transform and validate fish data
   if (Array.isArray(validated.fish)) {
@@ -188,8 +211,7 @@ function normalizeDecorItem(decor: unknown) {
   const item = decor as UnknownRecord;
   const size = typeof item.size === 'string' && DECOR_SIZES.has(item.size) ? item.size : 'm';
   const type = typeof item.type === 'string' && DECOR_TYPES.has(item.type) ? item.type : 'plant';
-  const r =
-    typeof item.r === 'number' && Number.isFinite(item.r) ? item.r : DECOR_RADIUS_BY_SIZE[size];
+  const r = type === 'rock' ? ROCK_RADIUS_BY_SIZE[size] : DECOR_RADIUS_BY_SIZE[size];
   return {
     id:
       typeof item.id === 'string' && item.id
@@ -212,6 +234,8 @@ interface FishGenes {
   hungerDrive?: number;
   rarityGene?: number;
   constitution?: number;
+  defAffGene?: number;
+  defAffType?: string;
   colorHue?: number;
   pattern?: string;
   finType?: string;
@@ -241,6 +265,8 @@ interface FishData {
   dead?: boolean;
   shiny?: boolean;
   favorite?: boolean;
+  defAffGene?: number;
+  defAffType?: string;
   genes?: FishGenes;
   [key: string]: unknown; // For backward compatibility with additional properties
 }
@@ -374,6 +400,13 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
   // Gene validations
   const genes = validated.genes;
 
+  if (
+    typeof (validated as UnknownRecord).decorAffinityGene === 'number' &&
+    genes.defAffGene == null
+  ) {
+    genes.defAffGene = (validated as UnknownRecord).decorAffinityGene as number;
+  }
+
   // Drop legacy rarity tag (only keep rarityGene)
   if ('rarity' in validated) {
     delete (validated as UnknownRecord).rarity;
@@ -437,6 +470,23 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     }
   });
 
+  if (typeof (genes as UnknownRecord).decorAffinityGene === 'number' && genes.defAffGene == null) {
+    genes.defAffGene = (genes as UnknownRecord).decorAffinityGene as number;
+  }
+  if (typeof (genes as UnknownRecord).decorAffinityType === 'string' && !genes.defAffType) {
+    genes.defAffType = (genes as UnknownRecord).decorAffinityType as string;
+  }
+
+  if (typeof genes.defAffGene === 'number') {
+    genes.defAffGene = clampDefAffGene(genes.defAffGene);
+  } else {
+    genes.defAffGene = 0;
+  }
+
+  if (typeof genes.defAffType !== 'string' || !DECOR_TYPES.has(genes.defAffType)) {
+    genes.defAffType = 'plant';
+  }
+
   // If top-level appearance fields exist and genes are missing, use top-level values.
   if (typeof validated.colorHue === 'number' && typeof genes.colorHue !== 'number') {
     genes.colorHue = validated.colorHue;
@@ -486,16 +536,34 @@ function validateAndTransformFish(fish: unknown, timestamp: number): FishData | 
     'hungerDrive',
     'rarityGene',
     'constitution',
+    'defAffGene',
   ];
   topLevelGenes.forEach(key => {
     if (typeof validated[key] === 'number') {
       validated[key] =
-        key === 'senseGene' ? clampSenseGene(validated[key]) : clampGene(validated[key]);
+        key === 'senseGene'
+          ? clampSenseGene(validated[key])
+          : key === 'defAffGene'
+            ? clampDefAffGene(validated[key])
+            : clampGene(validated[key]);
     } else {
       (validated as UnknownRecord)[key] = genes[key];
     }
     (genes as UnknownRecord)[key] = (validated as UnknownRecord)[key];
   });
+
+  const legacyType = (validated as UnknownRecord).decorAffinityType;
+  if (typeof legacyType === 'string' && DECOR_TYPES.has(legacyType) && !genes.defAffType) {
+    genes.defAffType = legacyType;
+  }
+  if (
+    typeof (validated as UnknownRecord).defAffType === 'string' &&
+    DECOR_TYPES.has((validated as UnknownRecord).defAffType as string)
+  ) {
+    genes.defAffType = (validated as UnknownRecord).defAffType as string;
+  } else {
+    (validated as UnknownRecord).defAffType = genes.defAffType;
+  }
 
   // Normalize top-level appearance fields to match validated genes
   validated.colorHue = genes.colorHue;
@@ -630,6 +698,8 @@ function createDefaultFish() {
       hungerDrive: 5,
       rarityGene: 5,
       constitution: 5,
+      defAffGene: 0,
+      defAffType: 'plant',
       colorHue: hue,
       patternType: 'solid',
       finShape: 'fan',
@@ -749,6 +819,11 @@ function clampGene(value: unknown, min: number = 0, max: number = 9): number {
  */
 function clampSenseGene(value: unknown): number {
   return clampGene(value, 1, 9);
+}
+
+function clampDefAffGene(value: unknown): number {
+  const num = typeof value === 'number' && !isNaN(value) ? Math.round(value) : 0;
+  return Math.min(9, Math.max(-9, num));
 }
 
 function validateInventoryPresets(presets: unknown[]): InventoryPreset[] {

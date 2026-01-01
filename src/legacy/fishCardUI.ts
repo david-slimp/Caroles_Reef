@@ -53,6 +53,9 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
     byId('#fc-core-stats').textContent =
       `Speed: ${f.speed} | Sense: ${f.senseGene} | Hunger: ${f.hungerDrive} | Rarity: ${f.rarityGene} | Con: ${f.constitution ?? 5}`;
 
+    byId('#fc-decor-aff').textContent =
+      `Def Aff: ${f.defAffGene ?? 0} (${f.defAffType || 'plant'})`;
+
     byId('#fc-appearance').textContent =
       `Hue: ${f.colorHue} | Pattern: ${f.patternType} | Fin: ${f.finShape} | Eye: ${f.eyeType}`;
 
@@ -93,6 +96,7 @@ export function createFishCardUI({ fish, tankFishIds, fishCardEl, toast }: Deps)
       <div class="small">ID: <span id="fc-id"></span></div>
       <div class="small">Age: <span id="fc-age"></span> • Size: <span id="fc-size"></span></div>
       <div class="small" id="fc-core-stats"></div>
+      <div class="small" id="fc-decor-aff"></div>
       <div class="small" id="fc-appearance"></div>
       <div class="small" id="fc-parents"></div>
 

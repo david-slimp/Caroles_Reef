@@ -6,7 +6,7 @@
   "main": "src/main.ts",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/update-meta.js && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest",

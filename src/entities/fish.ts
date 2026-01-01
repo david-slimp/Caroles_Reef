@@ -25,6 +25,8 @@ type FishEntity = Record<string, unknown> & {
   hungerDrive?: number;
   rarityGene?: number;
   constitution?: number;
+  defAffGene?: number;
+  defAffType?: string;
   patternType?: string;
   finShape?: string;
   eyeType?: string;
@@ -39,6 +41,9 @@ type FishEntity = Record<string, unknown> & {
   y?: number;
   _lastUpdateTime?: number;
   _rockSlowTimer?: number;
+  _rockAvoidTimer?: number;
+  _rockCheckTimer?: number;
+  _rockLastDecor?: { x: number; y: number; r: number; type?: string };
   _wanderMode?: string;
   _wanderTimer?: number;
   _wanderTargetX?: number;
@@ -53,6 +58,17 @@ let getSizeFn: () => { W: number; H: number } = () => viewportSize;
 let pellets: unknown[] = [];
 let fish: FishEntity[] = [];
 let decors: Array<{ x: number; y: number; r: number; type?: string }> = [];
+let rockIndexDirty = true;
+let rockIndex = new Map<string, Array<{ x: number; y: number; r: number; type?: string }>>();
+const ROCK_CELL_SIZE = 220;
+const ROCK_CHECK_INTERVAL = 1 / 6;
+const COLLECTION_UPDATE_INTERVAL_MS_VISIBLE = 2000;
+const COLLECTION_UPDATE_INTERVAL_MS_HIDDEN = 30000;
+const DECOR_TARGET_OFFSET_SCALE = 1.8;
+let collectionVisibilityCache = {
+  visible: false,
+  checkedAt: 0,
+};
 let topInset = 10;
 
 /**
@@ -76,14 +92,81 @@ export function configureFish(config: {
   pellets = config.pellets;
   fish = config.fish;
   decors = Array.isArray(config.decors) ? (config.decors as typeof decors) : [];
+  rockIndexDirty = true;
   if (typeof config.topInset === 'number') {
     topInset = config.topInset;
   }
 }
 
+export function markDecorDirty(): void {
+  rockIndexDirty = true;
+}
+
 function syncViewportSize() {
   viewportSize = getSizeFn();
   return viewportSize;
+}
+
+function rebuildRockIndex() {
+  rockIndex = new Map();
+  if (!decors.length) {
+    rockIndexDirty = false;
+    return;
+  }
+  decors.forEach(d => {
+    if (!d || d.type !== 'rock') return;
+    const minX = Math.floor((d.x - d.r) / ROCK_CELL_SIZE);
+    const maxX = Math.floor((d.x + d.r) / ROCK_CELL_SIZE);
+    const minY = Math.floor((d.y - d.r) / ROCK_CELL_SIZE);
+    const maxY = Math.floor((d.y + d.r) / ROCK_CELL_SIZE);
+    for (let cx = minX; cx <= maxX; cx += 1) {
+      for (let cy = minY; cy <= maxY; cy += 1) {
+        const key = `${cx},${cy}`;
+        const bucket = rockIndex.get(key);
+        if (bucket) {
+          bucket.push(d);
+        } else {
+          rockIndex.set(key, [d]);
+        }
+      }
+    }
+  });
+  rockIndexDirty = false;
+}
+
+function getNearbyRocks(x: number, y: number) {
+  if (rockIndexDirty) {
+    rebuildRockIndex();
+  }
+  const cx = Math.floor(x / ROCK_CELL_SIZE);
+  const cy = Math.floor(y / ROCK_CELL_SIZE);
+  const rocks: Array<{ x: number; y: number; r: number; type?: string }> = [];
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dy = -1; dy <= 1; dy += 1) {
+      const bucket = rockIndex.get(`${cx + dx},${cy + dy}`);
+      if (bucket && bucket.length) {
+        rocks.push(...bucket);
+      }
+    }
+  }
+  return rocks;
+}
+
+async function isCollectionVisibleCached(): Promise<boolean> {
+  const now = Date.now();
+  if (now - collectionVisibilityCache.checkedAt < COLLECTION_UPDATE_INTERVAL_MS_VISIBLE) {
+    return collectionVisibilityCache.visible;
+  }
+  try {
+    const { fishCollection } = await import('../ui/FishCollection');
+    collectionVisibilityCache = {
+      visible: fishCollection.isVisible(),
+      checkedAt: now,
+    };
+  } catch (error) {
+    console.error('Error checking FishCollection visibility:', error);
+  }
+  return collectionVisibilityCache.visible;
 }
 
 /**
@@ -171,6 +254,7 @@ function killFish(f: FishEntity) {
 const patterns = ['solid', 'stripes', 'spots', 'gradient'];
 const fins = ['pointy', 'round', 'fan', 'forked', 'lunate'];
 const eyes = ['round', 'sleepy', 'sparkly', 'winking'];
+const decorTypes = ['plant', 'coral', 'rock', 'chest'];
 
 /* ---------------- genetics helpers ---------------- */
 function inheritNum(a, b) {
@@ -178,6 +262,10 @@ function inheritNum(a, b) {
 }
 function mutateNum(v, mutationChance = 0.05) {
   if (chance(mutationChance)) return clamp(v + (chance(0.5) ? 1 : -1), 0, 9);
+  return v;
+}
+function mutateDecorAffinity(v, mutationChance = 0.05) {
+  if (chance(mutationChance)) return clamp(v + (chance(0.5) ? 1 : -1), -9, 9);
   return v;
 }
 function inheritList(a, b) {
@@ -189,6 +277,9 @@ function mutateHue(h, mutationChance = 0.05) {
 }
 function maybeShiny(rarityGene) {
   return chance(0.02 + rarityGene * 0.002);
+}
+function pickDecorType() {
+  return decorTypes[randi(0, decorTypes.length)];
 }
 
 /* ---------------- new gene knobs ---------------- */
@@ -315,6 +406,8 @@ export function makeFish(
     senseGene: randi(0, 9),
     hungerDrive: randi(2, 8),
     rarityGene: randi(0, 9),
+    defAffGene: randi(-9, 10),
+    defAffType: pickDecorType(),
     colorHue: randi(0, 360),
     patternType: patterns[randi(0, patterns.length)],
     finShape: fins[randi(0, fins.length)],
@@ -410,6 +503,13 @@ export function breed(a, b) {
     const senseGene = mutateNum(inheritNum(a.senseGene ?? 5, b.senseGene ?? 5), mutationChance);
     const hungerDrive = mutateNum(inheritNum(a.hungerDrive, b.hungerDrive), mutationChance);
     const rarityGene = mutateNum(inheritNum(a.rarityGene, b.rarityGene), mutationChance);
+    const defAffGene = mutateDecorAffinity(
+      inheritNum(a.defAffGene ?? 0, b.defAffGene ?? 0),
+      mutationChance
+    );
+    const defAffType = chance(mutationChance)
+      ? pickDecorType()
+      : inheritList(a.defAffType, b.defAffType);
     const colorHue = mutateHue(inheritNum(a.colorHue, b.colorHue), mutationChance);
     const patternType = inheritList(a.patternType, b.patternType);
     const finShape = inheritList(a.finShape, b.finShape);
@@ -440,6 +540,8 @@ export function breed(a, b) {
         senseGene,
         hungerDrive,
         rarityGene,
+        defAffGene,
+        defAffType,
         colorHue,
         patternType,
         finShape,
@@ -564,14 +666,16 @@ async function updateFishProperties(
   if (fish.originalId) {
     // Don't debounce if this is a size update or forced
     const now = Date.now();
-    if (
-      forceUpdate ||
-      isSizeUpdate ||
-      !fish._lastUpdateTime ||
-      now - (fish._lastUpdateTime as number) > 2000
-    ) {
-      await updateFishInCollection(fish as FishEntity);
-      fish._lastUpdateTime = now;
+    const isVisible = await isCollectionVisibleCached();
+    const minIntervalMs = isVisible
+      ? COLLECTION_UPDATE_INTERVAL_MS_VISIBLE
+      : COLLECTION_UPDATE_INTERVAL_MS_HIDDEN;
+
+    if (forceUpdate || isSizeUpdate) {
+      if (!fish._lastUpdateTime || now - (fish._lastUpdateTime as number) > minIntervalMs) {
+        await updateFishInCollection(fish as FishEntity);
+        fish._lastUpdateTime = now;
+      }
 
       // If this is a size update and the collection is open, refresh it
       if (isSizeUpdate || forceUpdate) {
@@ -653,6 +757,14 @@ export async function updateFish(f, dt) {
   }
   if (f._rockSlowTimer && f._rockSlowTimer > 0) {
     f._rockSlowTimer = Math.max(0, f._rockSlowTimer - dt);
+  }
+  if (f._rockAvoidTimer && f._rockAvoidTimer > 0) {
+    f._rockAvoidTimer = Math.max(0, f._rockAvoidTimer - dt);
+  }
+  if (f._rockCheckTimer === undefined) {
+    f._rockCheckTimer = 0;
+  } else {
+    f._rockCheckTimer += dt;
   }
 
   // Store previous size to detect changes
@@ -984,43 +1096,128 @@ export async function updateFish(f, dt) {
       typeof f._wanderTargetY !== 'number';
 
     if (needsNewTarget) {
-      const roll = Math.random();
-      let mode = 'cruise';
-      if (roll < 0.2) mode = 'loiter';
-      else if (roll < 0.45) mode = 'slow';
-      else if (roll < 0.8) mode = 'cruise';
-      else if (roll < 0.9) mode = 'topbottom';
-      else mode = 'dart';
-
       let targetX = f.x;
       let targetY = f.y;
       let timer = 3;
       let speedMult = 1;
+      const affinityType = typeof f.defAffType === 'string' ? f.defAffType : undefined;
+      const affinityValue = typeof f.defAffGene === 'number' ? f.defAffGene : 0;
+      const affinityBias = clamp(affinityValue / 9, -1, 1);
+      const affinityStrength = Math.abs(affinityBias);
+      const decorCandidates = decors.filter(d => d.type);
+      const preferredDecor = affinityType
+        ? decorCandidates.filter(d => d.type === affinityType)
+        : [];
+      const nonPreferredDecor = affinityType
+        ? decorCandidates.filter(d => d.type !== affinityType)
+        : decorCandidates;
+
+      const findNearest = (items: typeof decorCandidates) => {
+        let best = null;
+        let bestDist = Infinity;
+        for (const item of items) {
+          const dist = Math.hypot(item.x - f.x, item.y - f.y);
+          if (dist < bestDist) {
+            best = item;
+            bestDist = dist;
+          }
+        }
+        return best ? { decor: best, dist: bestDist } : null;
+      };
+
+      const nearestPreferred = preferredDecor.length ? findNearest(preferredDecor) : null;
+      const nearPreferred =
+        !!nearestPreferred && nearestPreferred.dist <= nearestPreferred.decor.r + 140;
+      const farFromPreferred =
+        !!nearestPreferred && nearestPreferred.dist > nearestPreferred.decor.r + 260;
+
+      let loiterChance = 0.2;
+      let slowChance = 0.25;
+      let cruiseChance = 0.35;
+      let topBottomChance = 0.1;
+      let dartChance = 0.1;
+
+      if (affinityBias > 0 && preferredDecor.length) {
+        loiterChance += affinityStrength * 0.35 + (nearPreferred ? 0.15 : 0);
+        dartChance += affinityStrength * 0.35 + (farFromPreferred ? 0.2 : 0);
+        topBottomChance -= affinityStrength * 0.15;
+        cruiseChance -= affinityStrength * 0.1;
+      } else if (affinityBias < 0 && preferredDecor.length) {
+        loiterChance -= affinityStrength * 0.2;
+        slowChance -= affinityStrength * 0.15;
+        dartChance += affinityStrength * 0.35 + (nearPreferred ? 0.25 : 0);
+        topBottomChance += affinityStrength * 0.05;
+      }
+
+      loiterChance = clamp(loiterChance, 0.05, 0.75);
+      slowChance = clamp(slowChance, 0.05, 0.6);
+      cruiseChance = clamp(cruiseChance, 0.05, 0.6);
+      topBottomChance = clamp(topBottomChance, 0, 0.2);
+      dartChance = clamp(dartChance, 0.05, 0.6);
+
+      const totalChance = loiterChance + slowChance + cruiseChance + topBottomChance + dartChance;
+      const roll = Math.random() * totalChance;
+      let mode = 'cruise';
+      if (roll < loiterChance) mode = 'loiter';
+      else if (roll < loiterChance + slowChance) mode = 'slow';
+      else if (roll < loiterChance + slowChance + cruiseChance) mode = 'cruise';
+      else if (roll < loiterChance + slowChance + cruiseChance + topBottomChance)
+        mode = 'topbottom';
+      else mode = 'dart';
+
+      const pickDecorTarget = (
+        baseChance: number,
+        minOffset: number,
+        maxOffset: number,
+        scale: number = 1
+      ) => {
+        const decorChance = clamp(baseChance + affinityBias * 0.25, 0.1, 0.9);
+        if (!decorCandidates.length || Math.random() >= decorChance) {
+          return null;
+        }
+        let pool = decorCandidates;
+        if (affinityValue > 0 && preferredDecor.length) {
+          pool = preferredDecor;
+        } else if (affinityValue < 0 && nonPreferredDecor.length) {
+          pool = nonPreferredDecor;
+        }
+        if (!pool.length && preferredDecor.length) {
+          const d = preferredDecor.reduce((closest, current) => {
+            const closestDist = Math.hypot((closest?.x || 0) - f.x, (closest?.y || 0) - f.y);
+            const currentDist = Math.hypot(current.x - f.x, current.y - f.y);
+            return currentDist < closestDist ? current : closest;
+          }, preferredDecor[0]);
+          const dx = (f.x || 0) - d.x;
+          const dy = (f.y || 0) - d.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const away = d.r + rand(50, 90);
+          return { x: f.x + (dx / dist) * away, y: f.y + (dy / dist) * away };
+        }
+        const d = pool[randi(0, pool.length)];
+        const angle = rand(0, Math.PI * 2);
+        const closeBias = affinityValue > 0 && d.type === affinityType ? 0.6 : 1;
+        const radius = d.r + rand(minOffset * scale, maxOffset * scale) * closeBias;
+        return { x: d.x + Math.cos(angle) * radius, y: d.y + Math.sin(angle) * radius };
+      };
 
       if (mode === 'loiter') {
-        timer = rand(3, 6);
+        timer = rand(5, 8) + affinityStrength * (nearPreferred ? 2 : 0.5);
         speedMult = rand(0.12, 0.25);
-        const decorCandidates = decors.filter(d => d.type === 'plant' || d.type === 'rock');
-        if (decorCandidates.length && Math.random() < 0.7) {
-          const d = decorCandidates[randi(0, decorCandidates.length)];
-          const angle = rand(0, Math.PI * 2);
-          const radius = d.r + rand(8, 25);
-          targetX = d.x + Math.cos(angle) * radius;
-          targetY = d.y + Math.sin(angle) * radius;
+        const decorTarget = pickDecorTarget(0.7, 8, 25, DECOR_TARGET_OFFSET_SCALE);
+        if (decorTarget) {
+          targetX = decorTarget.x;
+          targetY = decorTarget.y;
         } else {
           targetX = f.x + rand(-18, 18);
           targetY = f.y + rand(-12, 12);
         }
       } else if (mode === 'slow') {
-        timer = rand(2, 6);
+        timer = rand(4, 8) + affinityStrength * (nearPreferred ? 1.5 : 0.4);
         speedMult = rand(0.35, 0.7);
-        const decorCandidates = decors.filter(d => d.type === 'plant' || d.type === 'rock');
-        if (decorCandidates.length && Math.random() < 0.6) {
-          const d = decorCandidates[randi(0, decorCandidates.length)];
-          const angle = rand(0, Math.PI * 2);
-          const radius = d.r + rand(20, 60);
-          targetX = d.x + Math.cos(angle) * radius;
-          targetY = d.y + Math.sin(angle) * radius;
+        const decorTarget = pickDecorTarget(0.6, 20, 60, DECOR_TARGET_OFFSET_SCALE);
+        if (decorTarget) {
+          targetX = decorTarget.x;
+          targetY = decorTarget.y;
         } else if (fish.length > 1 && Math.random() < 0.35) {
           const other = fish[randi(0, fish.length)];
           if (other && other !== f) {
@@ -1033,20 +1230,64 @@ export async function updateFish(f, dt) {
         }
       } else if (mode === 'dart') {
         timer = rand(0.8, 1.6);
-        speedMult = rand(1.4, 2.1);
-        targetX = rand(20, W - 20);
-        targetY = rand(minY + 10, maxY - 10);
+        speedMult = rand(1.4, 2.1) + affinityStrength * 0.4;
+        const decorTarget = pickDecorTarget(0.85, 10, 35, DECOR_TARGET_OFFSET_SCALE);
+        if (affinityBias > 0 && decorTarget) {
+          targetX = decorTarget.x;
+          targetY = decorTarget.y;
+        } else if (affinityBias < 0 && nearestPreferred) {
+          const dx = f.x - nearestPreferred.decor.x;
+          const dy = f.y - nearestPreferred.decor.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const away = nearestPreferred.decor.r + rand(80, 140);
+          targetX = f.x + (dx / dist) * away;
+          targetY = f.y + (dy / dist) * away;
+        } else {
+          targetX = rand(20, W - 20);
+          targetY = rand(minY + 10, maxY - 10);
+        }
       } else if (mode === 'topbottom') {
         timer = rand(12, 30);
         speedMult = rand(0.55, 1.05);
         f._wanderTopBottomY = Math.random() < 0.5 ? minY + rand(20, 80) : maxY - rand(20, 80);
         targetX = rand(20, W - 20);
         targetY = f._wanderTopBottomY;
+      } else if (mode === 'cruise') {
+        timer = rand(3, 7);
+        speedMult = rand(0.7, 1.2);
+        const decorTarget = pickDecorTarget(0.35, 30, 90, DECOR_TARGET_OFFSET_SCALE);
+        if (decorTarget) {
+          targetX = decorTarget.x;
+          targetY = decorTarget.y;
+        } else {
+          targetX = rand(20, W - 20);
+          targetY = f.y + rand(-80, 80);
+        }
       } else {
         timer = rand(3, 7);
         speedMult = rand(0.7, 1.2);
         targetX = rand(20, W - 20);
         targetY = f.y + rand(-80, 80);
+      }
+
+      if (affinityBias > 0 && nearestPreferred && affinityStrength > 0.5) {
+        const maxRange = nearestPreferred.decor.r + 220 - affinityStrength * 60;
+        const dx = targetX - nearestPreferred.decor.x;
+        const dy = targetY - nearestPreferred.decor.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        if (dist > maxRange) {
+          targetX = nearestPreferred.decor.x + (dx / dist) * maxRange;
+          targetY = nearestPreferred.decor.y + (dy / dist) * maxRange;
+        }
+      } else if (affinityBias < 0 && nearestPreferred && affinityStrength > 0.5) {
+        const minRange = nearestPreferred.decor.r + 140 + affinityStrength * 40;
+        const dx = targetX - nearestPreferred.decor.x;
+        const dy = targetY - nearestPreferred.decor.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        if (dist < minRange) {
+          targetX = nearestPreferred.decor.x + (dx / dist) * minRange;
+          targetY = nearestPreferred.decor.y + (dy / dist) * minRange;
+        }
       }
 
       const minTargetDist =
@@ -1221,33 +1462,62 @@ export async function updateFish(f, dt) {
   f.x += f.vx * dt;
   f.y += f.vy * dt;
 
-  // rock collisions: bounce or deflect, add vertical nudge, and short slow-down
-  for (let i = 0; i < decors.length; i += 1) {
-    const d = decors[i];
-    if (!d || d.type !== 'rock') continue;
-    const dx = (f.x || 0) - d.x;
-    const dy = (f.y || 0) - d.y;
+  // rock collisions: loiter briefly, then steer away (avoid jittery spins)
+  const fishRadius = Math.max(8, (f.size || 10) * 0.6);
+  if (f._rockLastDecor && f._rockLastDecor.type === 'rock') {
+    const dx = (f.x || 0) - f._rockLastDecor.x;
+    const dy = (f.y || 0) - f._rockLastDecor.y;
     const dist = Math.hypot(dx, dy);
-    const fishRadius = Math.max(8, (f.size || 10) * 0.6);
-    const minDist = d.r + fishRadius;
+    const minDist = f._rockLastDecor.r + fishRadius;
     if (dist < minDist) {
       const nx = dist > 0 ? dx / dist : Math.cos(Math.random() * Math.PI * 2);
       const ny = dist > 0 ? dy / dist : Math.sin(Math.random() * Math.PI * 2);
-      const speed = Math.max(10, Math.hypot(f.vx || 0, f.vy || 0));
-      const bounce = Math.random() < 0.75;
-      f.x = d.x + nx * minDist;
-      f.y = d.y + ny * minDist;
-      if (bounce) {
-        const dot = (f.vx || 0) * nx + (f.vy || 0) * ny;
-        f.vx = (f.vx || 0) - 2 * dot * nx;
-        f.vy = (f.vy || 0) - 2 * dot * ny;
-      } else {
-        f.vx = (f.vx || 0) * 0.8;
-        f.vy = (f.vy || 0) * 0.8;
+      f.x = f._rockLastDecor.x + nx * minDist;
+      f.y = f._rockLastDecor.y + ny * minDist;
+      f.vx *= 0.5;
+      f.vy *= 0.5;
+    }
+  }
+
+  if (f._rockCheckTimer >= ROCK_CHECK_INTERVAL) {
+    f._rockCheckTimer = 0;
+    const nearbyRocks = getNearbyRocks(f.x || 0, f.y || 0);
+    for (let i = 0; i < nearbyRocks.length; i += 1) {
+      const d = nearbyRocks[i];
+      if (!d || d.type !== 'rock') continue;
+      const dx = (f.x || 0) - d.x;
+      const dy = (f.y || 0) - d.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = d.r + fishRadius;
+      const buffer = 16;
+      const nx = dist > 0 ? dx / dist : Math.cos(Math.random() * Math.PI * 2);
+      const ny = dist > 0 ? dy / dist : Math.sin(Math.random() * Math.PI * 2);
+
+      if (dist < minDist) {
+        f.x = d.x + nx * minDist;
+        f.y = d.y + ny * minDist;
+        f.vx *= 0.5;
+        f.vy *= 0.5;
+        f._rockLastDecor = d;
+        break;
       }
-      f.vy += (Math.random() < 0.5 ? -1 : 1) * speed * 0.2;
-      f._rockSlowTimer = 1;
-      break;
+
+      if ((!f._rockAvoidTimer || f._rockAvoidTimer <= 0) && dist < minDist + buffer) {
+        const avoidDist = d.r + rand(80, 140);
+        const jitter = rand(-0.6, 0.6);
+        const awayAngle = Math.atan2(ny, nx) + jitter;
+        const minY = Math.max(topInset, 10);
+        f._wanderMode = 'loiter';
+        f._wanderTimer = rand(3, 7);
+        f._wanderTargetX = clamp(f.x + Math.cos(awayAngle) * avoidDist, 10, W - 10);
+        f._wanderTargetY = clamp(f.y + Math.sin(awayAngle) * (avoidDist * 0.6), minY, H - 10);
+        f.vx *= 0.4;
+        f.vy *= 0.4;
+        f._rockSlowTimer = 1.2;
+        f._rockAvoidTimer = 1.8;
+        f._rockLastDecor = d;
+        break;
+      }
     }
   }
 

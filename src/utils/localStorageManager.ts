@@ -17,6 +17,7 @@ import { DEFAULT_SAVE_DATA, validateAndTransformGameData } from './gameDataValid
  * @property {string} settings.musicTrack - Currently playing music track
  * @property {string} settings.theme - Current UI theme identifier
  * @property {number} settings.uiScale - UI scaling factor
+ * @property {boolean} settings.paused - Whether the game is paused
  * @property {Array<Object>} fish - Collection of fish in the aquarium
  * @property {string} fish[].id - Unique identifier for the fish
  * @property {string} fish[].name - Display name of the fish
@@ -63,6 +64,10 @@ export interface GameSaveData {
     theme: string;
     /** UI scaling */
     uiScale: number;
+    /** Whether the game is paused */
+    paused?: boolean;
+    /** Debug decor radius overlay */
+    debugDecorRadius?: boolean;
   };
 
   // Fish collection (legacy, kept for backward compatibility)

@@ -40,6 +40,7 @@ type Deps = {
   refreshDex: () => void;
   decorSelect: { type: string; size: string };
   fish: any[];
+  onPauseChange?: (paused: boolean) => void;
 };
 
 export function setupUIControls(ui: UIRefs, deps: Deps) {
@@ -56,13 +57,20 @@ export function setupUIControls(ui: UIRefs, deps: Deps) {
     refreshDex,
     decorSelect,
     fish,
+    onPauseChange,
   } = deps;
 
   // Backup manager topbar mount (if present)
   // This is invoked by caller.
 
   // Pause checkbox
-  ui.pauseEl.onchange = () => (pausedRef.value = ui.pauseEl.checked);
+  ui.pauseEl.onchange = () => {
+    const isPaused = ui.pauseEl.checked;
+    pausedRef.value = isPaused;
+    if (onPauseChange) {
+      onPauseChange(isPaused);
+    }
+  };
 
   // Update mute button states
   const updateMuteButtons = () => {

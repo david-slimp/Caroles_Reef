@@ -7,6 +7,8 @@ import { storageManager, GameSaveData } from './localStorageManager';
 interface RestoreOptions {
   file: File;
   preserveTankFish?: boolean;
+  restoreTankFish?: boolean;
+  restoreTankLayout?: boolean;
 }
 
 interface FishData {
@@ -75,6 +77,7 @@ class BackupManager {
       // Get current game state
       // We need to set gameState = to the current game state from GameState.ts using the prper method given in there ....  not from storageManager
       const currentGameState = gameState.getState();
+      const tankFishSnapshot = gameState.getTankSnapshot();
 
       // Get the current in-memory bio (fish) Inventory
       const bioInventory = fishManager.getSavedFish();
@@ -87,6 +90,7 @@ class BackupManager {
         ...currentGameState,
         // Ensure we don't include any functions or circular references
         fish: [], // Fish are handled separately in fishCollection
+        tankFish: tankFishSnapshot,
         fishCollection: normalizedCollection,
         bioInventory: normalizedBioInventory.map(fish => ({
           ...fish,
@@ -115,7 +119,9 @@ class BackupManager {
    */
   public async restoreBackup(
     backupData: string,
-    preserveTankFish: boolean = true
+    preserveTankFish: boolean = true,
+    restoreTankFish: boolean = true,
+    restoreTankLayout: boolean = true
   ): Promise<boolean> {
     console.log('Starting restoreBackup with preserveTankFish:', preserveTankFish);
 
@@ -190,6 +196,18 @@ class BackupManager {
         lastSaved: Date.now(),
       };
 
+      if (!restoreTankLayout) {
+        updatedData.tank = currentData.tank;
+      } else if (!backupCopy.tank || typeof backupCopy.tank !== 'object') {
+        updatedData.tank = { background: 'default', decorations: [] };
+      }
+
+      if (!restoreTankFish) {
+        updatedData.tankFish = [];
+        updatedData.fishInTank = [];
+        updatedData.fishInTankOriginalIds = [];
+      }
+
       console.log(`Restoring ${updatedData.fishCollection.length} fish from backup`);
 
       // Validate the fish collection before saving
@@ -198,8 +216,47 @@ class BackupManager {
         throw new Error('Failed to validate fish collection from backup');
       }
 
-      // Update the data with validated collection
-      updatedData.fishCollection = validatedFishCollection;
+      // Update the data with validated collection (dedupe by id)
+      const dedupedCollection: FishData[] = [];
+      const collectionIds = new Set<string>();
+      validatedFishCollection.forEach(fish => {
+        const id = fish?.id;
+        if (!id) {
+          return;
+        }
+        if (collectionIds.has(id)) {
+          console.warn(`[BackupManager] Duplicate collection fish id "${id}" skipped`);
+          return;
+        }
+        collectionIds.add(id);
+        dedupedCollection.push(fish);
+      });
+      updatedData.fishCollection = dedupedCollection;
+
+      const validatedTankFish = restoreTankFish
+        ? Array.isArray(updatedData.tankFish)
+          ? updatedData.tankFish
+              .map((fish: FishData) =>
+                gameDataValidator.validateAndTransformFish(fish, Math.floor(Date.now() / 1000))
+              )
+              .filter(Boolean)
+          : []
+        : [];
+      const tankIds = new Set<string>();
+      const dedupedTankFish: FishData[] = [];
+      (validatedTankFish as FishData[]).forEach(fish => {
+        const id = fish?.id;
+        if (!id) {
+          return;
+        }
+        if (tankIds.has(id)) {
+          console.warn(`[BackupManager] Duplicate tank fish id "${id}" skipped`);
+          return;
+        }
+        tankIds.add(id);
+        dedupedTankFish.push(fish);
+      });
+      updatedData.tankFish = dedupedTankFish;
 
       // Ensure fish array is populated for backward compatibility
       if (Array.isArray(updatedData.fishCollection) && !Array.isArray(updatedData.fish)) {
@@ -316,10 +373,16 @@ class BackupManager {
         }
 
         // Notify components about the update
+        const seedIfEmpty = !preserveTankFish && !restoreTankFish;
         const event = new CustomEvent('backupRestored', {
           detail: {
             fishCount: win.fish?.length || 0,
             collectionCount: win.fishCollection?.length || 0,
+            preserveTankFish,
+            restoreTankFish,
+            restoreTankLayout,
+            tankFish: updatedData.tankFish || [],
+            seedIfEmpty,
           },
         });
         window.dispatchEvent(event);
@@ -426,7 +489,12 @@ class BackupManager {
           }
 
           console.log('Starting backup restore...');
-          const result = await this.restoreBackup(event.target.result as string, preserveTankFish);
+          const result = await this.restoreBackup(
+            event.target.result as string,
+            preserveTankFish,
+            options.restoreTankFish ?? true,
+            options.restoreTankLayout ?? true
+          );
 
           resolve(result);
         } catch (error) {

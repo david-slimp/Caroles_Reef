@@ -37,6 +37,8 @@ const COLUMN_LABELS: Record<string, string> = {
   hungerDrive: 'Hunger',
   constitution: 'Constitution',
   rarityGene: 'Rarity',
+  defAffGene: 'Def Aff',
+  defAffType: 'Def Type',
   colorHue: 'Hue',
   finShape: 'Fins',
   patternType: 'Pattern',
@@ -66,6 +68,11 @@ const FILTER_DEFS: Record<string, FilterDef> = {
   hungerDrive: { type: 'number-set', options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
   constitution: { type: 'number-set', options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
   rarityGene: { type: 'number-set', options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
+  defAffGene: {
+    type: 'number-set',
+    options: [-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  },
+  defAffType: { type: 'set', options: ['plant', 'coral', 'rock', 'chest'] },
   colorHue: { type: 'number-range' },
   finShape: { type: 'set', options: ['pointy', 'round', 'fan', 'forked', 'lunate'] },
   patternType: { type: 'set', options: ['solid', 'gradient', 'spots', 'stripes'] },
@@ -95,6 +102,8 @@ const DEFAULT_COLUMN_ORDER = [
   'hungerDrive',
   'constitution',
   'rarityGene',
+  'defAffGene',
+  'defAffType',
   'colorHue',
   'finShape',
   'patternType',
@@ -134,6 +143,18 @@ const COLUMN_DEFS: Record<
   hungerDrive: { label: 'Hunger', width: 'width: 58px;', sortable: true, filterable: true },
   constitution: { label: 'Constitution', width: 'width: 58px;', sortable: true, filterable: true },
   rarityGene: { label: 'Rarity', width: 'width: 58px;', sortable: true, filterable: true },
+  defAffGene: {
+    label: 'Def Aff',
+    width: 'width: 72px;',
+    sortable: true,
+    filterable: true,
+  },
+  defAffType: {
+    label: 'Def Type',
+    width: 'width: 78px;',
+    sortable: true,
+    filterable: true,
+  },
   colorHue: { label: 'Hue', width: 'width: 72px;', sortable: true, filterable: true },
   finShape: { label: 'Fins', width: 'width: 58px;', sortable: true, filterable: true },
   patternType: { label: 'Pattern', width: 'width: 58px;', sortable: true, filterable: true },
@@ -551,6 +572,13 @@ class NewCollectionModal {
         return { value: this.getGeneNumber(fishData, 'constitution'), isNumeric: true };
       case 'rarityGene':
         return { value: this.getGeneNumber(fishData, 'rarityGene'), isNumeric: true };
+      case 'defAffGene':
+        return { value: this.getGeneNumber(fishData, 'defAffGene'), isNumeric: true };
+      case 'defAffType':
+        return {
+          value: this.getGeneString(fishData, 'defAffType').toLowerCase(),
+          isNumeric: false,
+        };
       case 'colorHue':
         return { value: this.getGeneNumber(fishData, 'colorHue'), isNumeric: true };
       case 'finShape':
@@ -1832,6 +1860,8 @@ class NewCollectionModal {
     const hungerDrive = this.getGeneNumber(fishData, 'hungerDrive');
     const constitution = this.getGeneNumber(fishData, 'constitution');
     const rarityGene = this.getGeneNumber(fishData, 'rarityGene');
+    const defAffGene = this.getGeneNumber(fishData, 'defAffGene');
+    const defAffType = this.getGeneString(fishData, 'defAffType');
     const colorHue = this.getGeneNumber(fishData, 'colorHue');
     const finShape = this.getGeneString(fishData, 'finShape');
     const patternType = this.getGeneString(fishData, 'patternType');
@@ -1856,6 +1886,8 @@ class NewCollectionModal {
       hungerDrive: formatNumber(hungerDrive),
       constitution: formatNumber(constitution),
       rarityGene: formatNumber(rarityGene),
+      defAffGene: formatNumber(defAffGene),
+      defAffType: defAffType ? formatText(defAffType) : '—',
       colorHue: `${formatNumber(colorHue)}° ${colorSwatch}`,
       finShape: finShape ? getTailShapeDisplayName(finShape as TailShape) : '—',
       patternType: patternType || '—',

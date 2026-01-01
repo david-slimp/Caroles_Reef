@@ -1,16 +1,34 @@
 # Changelog
 
-## [0.1.7] - 2025-12-29
+## [0.1.7] - 2025-12-31
 ### Changed
 - Bumped app version to 0.1.7
+- Strengthened decor affinity behavior to bias wander modes, target distance, and darting
+- Rock avoidance now loiters briefly and steers away to reduce jitter
+- Rock avoidance throttled to reduce CPU load and keep movement speed stable
+- Rock avoidance now uses a rock index and periodic checks to reduce per-frame work
+- Reduced decor collision radii and adjusted plant rendering baseline
+- Rock blocking radius now matches rock ellipse width (18/30/48)
+- Added decor radius debug toggle with persistent setting
+- Selected decor now renders above others by moving it to the end of the array
+- Pause checkbox now polled each frame to avoid missed toggle events
+- Tank fish updates now throttle collection writes when the collection panel is closed
 ### Added
 - Fish now bounce/deflect off rocks with a brief slow-down and vertical nudge on collision
 - Added varied wander behaviors (loiter, slow, cruise, dart, top-bottom) for more natural fish movement
 - Added a selected-fish tooltip showing current state and wander mode
+- Added decor affinity gene (defAffGene/defAffType) to influence wandering preferences
 ### Fixed
 - Persisted placed decor in localStorage and backup/restore flows
+- Persisted pause toggle state in localStorage and backup/restore flows
 - Allowed decor items to be moved (drag) or removed (shift-click/right-click) after placement
 - Restored FishCard selection on click after drag handling changes
+- Restoring without keeping tank fish now clears the tank and seeds new fish when needed
+- Restore dialog now includes options to restore tank fish and tank layout separately
+- Restore now uses fishInTank IDs to rebuild the tank when tankFish is empty
+- Restore now prefers tank snapshot positions when available to keep live X/Y accurate
+- Restore now merges tankFish snapshots with fishInTank to rebuild the live tank without duplicates
+- Backup restore now skips duplicate fish IDs in collection or tank and warns in console
 
 ## [0.1.6] - 2025-12-28
 ### Added

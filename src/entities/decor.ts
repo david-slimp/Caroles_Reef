@@ -17,7 +17,11 @@ export function configureDecor(e: Env) {
 export const decorSelect = { type: 'plant', size: 'm' as const };
 
 export function decorRadius(size: 's' | 'm' | 'l') {
-  return size === 's' ? 30 : size === 'm' ? 50 : 80;
+  return size === 's' ? 20 : size === 'm' ? 25 : 40;
+}
+
+function rockRadius(size: 's' | 'm' | 'l') {
+  return size === 's' ? 18 : size === 'm' ? 30 : 48;
 }
 
 const uuid = (() => {
@@ -26,7 +30,8 @@ const uuid = (() => {
 })();
 
 export function placeDecor(x: number, y: number): Decor {
-  const r = decorRadius(decorSelect.size);
+  const r =
+    decorSelect.type === 'rock' ? rockRadius(decorSelect.size) : decorRadius(decorSelect.size);
   const d: Decor = { id: uuid(), type: decorSelect.type, x, y, r, size: decorSelect.size };
   env.decors.push(d);
   env.toast(`Placed ${decorSelect.type}`);
@@ -50,6 +55,16 @@ export function removeDecor(target: Decor): boolean {
   }
   const [removed] = env.decors.splice(idx, 1);
   env.toast(`Removed ${removed.type}`);
+  return true;
+}
+
+export function bringDecorToFront(target: Decor): boolean {
+  const idx = env.decors.findIndex(d => d.id === target.id);
+  if (idx === -1) {
+    return false;
+  }
+  const [item] = env.decors.splice(idx, 1);
+  env.decors.push(item);
   return true;
 }
 
