@@ -82,7 +82,7 @@ The application is moving toward a centralized persistence model where:
    * REQUIRES: (none)
    * USED-BY: src/state/types.ts
  - src/entities/fish.ts - Fish entity logic and behavior
-   * REQUIRES: src/state/GameState.ts, src/ui/FishCollection.ts (dynamic), src/ui/toast.ts, src/utils/audio.ts
+   * REQUIRES: src/state/GameState.ts, src/render/eyeRenderer.ts, src/ui/FishCollection.ts (dynamic), src/ui/toast.ts, src/utils/audio.ts
    * USED-BY: src/legacy/runLegacyGame.ts
    * PERSISTENCE: Updates in-memory data only
  - src/entities/decor.ts - Decorations and environment
@@ -123,6 +123,9 @@ The application is moving toward a centralized persistence model where:
   * REQUIRES: src/state/types.ts
   * USED-BY: src/legacy/runLegacyGame.ts
   * NOTES: Debug decor radius overlay toggled by settings.debugDecorRadius
+- src/render/eyeRenderer.ts - Eye drawing helpers (species-agnostic)
+  * REQUIRES: (none)
+  * USED-BY: src/entities/fish.ts
 
 ## Configuration
 - src/config/gameConfig.ts - Game title/version/config values

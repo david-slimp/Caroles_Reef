@@ -7,6 +7,17 @@
 - TODO (duplication): Remove direct `storageManager.save()` calls from UI fallbacks once GameState path is unified.
 - Record: update `CHANGELOG.md` and `TODO.md` with cleanup results.
 
+## Eye rendering modularization + eyeType visuals (Issue #16)
+
+- DONE: Extract eye drawing from `src/entities/fish.ts` into a reusable renderer module (species-agnostic).
+- DONE: Keep eyeType values: `round`, `sleepy`, `sparkly`, `winking` (no new values yet).
+- DONE: Implement `round`: current default.
+- DONE: Implement `sleepy`: half-closed lid look with lower eye visible.
+- DONE: Implement `sparkly`: flash-only sparkle accents; +1px radius once size >= 10.
+- DONE: Implement `winking`: deterministic phase (no per-fish timers), ~1s closed, ~10s open.
+- DONE: Ensure eye size scales with fish size/age and supports future two-eye species.
+- DONE: Wire fish rendering to the new eye module and verify visuals in-game.
+
 ## Storage / validation flow concerns (high priority)
 
 - DONE: Confirmed `fishCollection` will evolve into `bioInventory` (schema/validator work deferred).
