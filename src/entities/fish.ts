@@ -1,4 +1,5 @@
 // src/entities/fish.ts
+import { drawEye } from '../render/eyeRenderer';
 import { gameState } from '../state/GameState';
 import { toast } from '../ui/toast';
 import { playSound } from '../utils/audio';
@@ -1740,6 +1741,29 @@ export function handleBreeding(_dt) {
 }
 
 /* ---------------- rendering ---------------- */
+function applyFishTransform(ctx: CanvasRenderingContext2D, f: FishEntity) {
+  const x = typeof f.x === 'number' ? f.x : 0;
+  const y = typeof f.y === 'number' ? f.y : 0;
+  const dir = typeof f.dir === 'number' ? f.dir : 0;
+  const facingLeft = Math.cos(dir) < 0;
+  const maxPitch = (65 * Math.PI) / 180;
+  const baseDir = normalizeAngle(facingLeft ? dir - Math.PI : dir);
+  const drawDir = Math.max(-maxPitch, Math.min(maxPitch, baseDir));
+  ctx.translate(x, y);
+  ctx.rotate(drawDir);
+  if (facingLeft) {
+    ctx.scale(-1, 1);
+  }
+  return { facingLeft, drawDir };
+}
+
+function normalizeAngle(angle: number) {
+  let a = angle;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
 function drawDeadFishWithHoles(ctx: CanvasRenderingContext2D, f: FishEntity) {
   const bodyLen = clamp(f.size * 2.2, 16, 140);
   const bodyHt = clamp(f.size * 1.2, 10, 80);
@@ -1842,8 +1866,7 @@ function drawDeadFishWithHoles(ctx: CanvasRenderingContext2D, f: FishEntity) {
   octx.restore();
 
   ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.dir);
+  applyFishTransform(ctx, f);
   ctx.drawImage(off, -ow / 2, -oh / 2);
   ctx.restore();
 }
@@ -1913,8 +1936,7 @@ export function drawFish(f: FishEntity, ctx: CanvasRenderingContext2D) {
   }
 
   ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.dir);
+  const { facingLeft, drawDir } = applyFishTransform(ctx, f);
 
   if (f.shiny) {
     ctx.shadowColor = `hsla(${f.colorHue}, 80%, 70%, 0.9)`;
@@ -2165,16 +2187,22 @@ export function drawFish(f: FishEntity, ctx: CanvasRenderingContext2D) {
   }
 
   // eye
-  ctx.fillStyle = '#fff';
   const eyeX = bodyLen * 0.22;
   const eyeY = -bodyHt * 0.1;
-  ctx.beginPath();
-  ctx.arc(eyeX, eyeY, Math.max(2, bodyHt * 0.12), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(eyeX + 1, eyeY, Math.max(1, bodyHt * 0.06), 0, Math.PI * 2);
-  ctx.fill();
+  const fishSize = typeof f.size === 'number' ? f.size : 0;
+  const timeMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  drawEye({
+    ctx,
+    eyeType: f.eyeType,
+    x: eyeX,
+    y: eyeY,
+    bodyLen,
+    bodyHt,
+    size: fishSize,
+    colorHue: f.colorHue,
+    timeMs,
+    idSeed: f.id || f.originalId || '',
+  });
 
   // mouth
   ctx.strokeStyle = '#000';
@@ -2186,7 +2214,10 @@ export function drawFish(f: FishEntity, ctx: CanvasRenderingContext2D) {
   // name label
   if (f.name && f.name !== 'Unnamed') {
     ctx.save();
-    ctx.rotate(-f.dir);
+    if (facingLeft) {
+      ctx.scale(-1, 1);
+    }
+    ctx.rotate(-drawDir);
     const fontPx = Math.max(10, Math.floor(f.size * 0.45));
     ctx.font = `${fontPx}px sans-serif`;
     ctx.textAlign = 'center';

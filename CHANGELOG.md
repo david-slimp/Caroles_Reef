@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.8] - 2026-01-02
+### Added
+- Added a reusable eye renderer module for species-agnostic eye drawing
+### Changed
+- Eye rendering now supports distinct `eyeType` visuals (sleepy, sparkly flash accents, winking animation)
+- Sparkly eyes now flash briefly instead of staying visible between flashes
+- Fish rendering now flips horizontally on leftward movement and clamps visual pitch to ±65°
+### Fixed
+- Fish no longer render upside down when swimming left
+
 ## [0.1.7] - 2025-12-31
 ### Changed
 - Bumped app version to 0.1.7
